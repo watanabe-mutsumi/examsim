@@ -1,0 +1,16 @@
+[package]
+name = "examsim"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bitvec = "0.22.3"
+enum-map = "1.1.1"
+enum-map-derive = "0.6.0"
+polars = {git = "https://github.com/ritchie46/polars"} 
+rand = "0.8.3"
+rayon = "1.5.1"
+statrs = "0.14.0"
+superslice = "1.0.0"
