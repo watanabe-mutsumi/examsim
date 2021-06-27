@@ -1,0 +1,5 @@
+#大学初期値CSVファイル
+initial_univ_csv = "./u2014v01.csv"
+
+#学生数初期値
+student_number = 560_000
