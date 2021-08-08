@@ -1,4 +1,4 @@
-uid,name,institute,pref,urban,capa,dev,enroll,over_rate
+cid,name,institute,pref,urban,capa,dev,enroll,over_rate
 60,旭川医科大学,1,1,地方,972,68.605,172,1.047
 40,小樽商科大学,1,1,地方,2060,54.77,515,1.115
 50,帯広畜産大学,1,1,地方,1100,52.185,250,1.1159999999999999

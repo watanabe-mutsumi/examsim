@@ -1,5 +1,18 @@
 #大学初期値CSVファイル
-initial_univ_csv = "./u2014v01.csv"
+initial_college_csv = "./u2014v01.csv"
 
 #学生数初期値
 student_number = 560_000
+
+#乱数シード初期値 u64
+random_seed = 42
+
+#ランク別大学グループの偏差値上限と下限
+#自分の偏差値+lower 〜　自分の偏差値+upper
+# 0:（チャレンジ校） 1:（本命校） 2:（安全校）
+college_rank_lower = [3, -3, -5]
+college_rank_upper = [5,  3, -3]
+
+#各ランクから何校選ぶか
+# 0:（チャレンジ校） 1:（本命校） 2:（安全校）
+college_rank_select_number = [2, 3, 1]
