@@ -5,7 +5,7 @@ use csv::ReaderBuilder;
 use std::cmp::min;
 
 use crate::student::{Student, Sid};
-use crate::config::{Config, MAX_ENROLLMENT_RATES};
+use crate::config::Config;
 
 pub type Cid = usize; //大学ID
 
@@ -66,7 +66,8 @@ impl College {
     fn enroll_num(&self) -> usize{
         let own_scale = self.college_scale();
         // 暫定: 2016(0)以前と2016(1)の増減率を取得。本当は毎年変わる。
-        let limit_change_rate = MAX_ENROLLMENT_RATES[0][own_scale]/MAX_ENROLLMENT_RATES[1][own_scale];
+        let limit_change_rate = 
+            Config::MAX_ENROLLMENT_RATES[0][own_scale]/Config::MAX_ENROLLMENT_RATES[1][own_scale];
         ((self.enroll as f64) * self.over_rate * limit_change_rate).ceil() as usize
     }
 

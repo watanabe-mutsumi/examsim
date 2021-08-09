@@ -6,7 +6,9 @@ use std::io::Read;
 use serde::Deserialize;
 use once_cell::sync::OnceCell;
 
+// グローバルな設定情報オブジェクト
 pub static CONFIG: OnceCell<Config> = OnceCell::new();
+
 
 
 #[derive(Debug,Clone,Deserialize)]
@@ -21,6 +23,36 @@ pub struct Config{
 }
 
 impl Config {
+    ///////////////////////////////////////////////////////
+    // 定数定義
+    //大学入試３マトリクスの各生成値の意味
+    pub const APPLY: u8 = 1;   //受験（学生）
+    pub const ENROLL: u8 = 2;  //合格判定（大学）
+    pub const ADMISSION: u8 = 4; //入学先に決定（学生）
+
+    //大学入試結果resultマトリクス集計時の意味
+    pub const R_FAILED: u8 = 1;  //不合格
+    pub const R_PASSED: u8 = 3;  //合格
+    pub const R_ADMISSION: u8 = 7; //入学
+
+    //大学設定区分
+    pub const NATIONAL: u8 = 1; //国立
+    pub const PUBLIC: u8 = 2; //公立
+    pub const PRIVATE: u8 = 3; //私立
+
+    //入学定員超過率の年度別上限
+    pub const MAX_ENROLLMENT_RATES: [[f64; 3]; 4] = [
+        // 大学規模L M S
+        [1.20, 1.30, 1.30], // < 2016
+        [1.17, 1.27, 1.30], //  2016
+        [1.14, 1.24, 1.30], //  2017
+        [1.10, 1.20, 1.30], //  2018 ~
+    ];
+
+    ///////////////////////////////////////////////////////
+    // ここから関数定義
+    // Configオブジェクト生成。　コマンドライン引数の設定ファイルから。
+    // Configオブジェクトは一度だけstaticで生成され、その後不変。
     pub fn from_args() -> Result<()>{
         let matches = App::new("大学受験戦略シミュレーション")
             .version(crate_version!())
@@ -41,6 +73,7 @@ impl Config {
         }
     }
 
+    // Configオブジェクト生成。　関数引数に直接指定された設定ファイル名から。
     pub fn from_path(path: &str) -> Result<()>{
         let mut f = fs::File::open(path).expect("config toml file not found");
         println!("設定ファイルは{:?}です。", path);
@@ -51,15 +84,8 @@ impl Config {
         Ok(())
     }
 
+    // 生成済みのConfigオブジェクトを返す
     pub fn get() -> &'static Config{
         CONFIG.get().expect("Not initalized Config")
     }
 }
-
-pub const MAX_ENROLLMENT_RATES: [[f64; 3]; 4] = [
-    // 大学規模L M S
-    [1.20, 1.30, 1.30], // < 2016
-    [1.17, 1.27, 1.30], //  2016
-    [1.14, 1.24, 1.30], //  2017
-    [1.10, 1.20, 1.30], //  2018 ~
-];

@@ -84,7 +84,7 @@ fn apply(students: Vec<Student>, colleges: &[College]) -> (Matrix, Vec<Student>)
     ).collect::<Vec<Student>>();
 
     // 出願sparseマトリクス　行=大学、列=受験生、値1(出願) を作成
-    let apply_matrix = make_matrix(&apply_list, colleges.len(), s2.len(), 1);
+    let apply_matrix = make_matrix(&apply_list, colleges.len(), s2.len(), Config::APPLY);
     (apply_matrix, s2)
 }
 
@@ -105,7 +105,7 @@ fn enroll(colleges: Vec<College>, students: &[Student], apply_mat: &Matrix) -> (
     ).collect::<Vec<College>>();
 
     // 合格sparseマトリクス　行=受験生、列=大学、値2(合格) を作成
-    let enroll_matrix = make_matrix(&enroll_list, students.len(), c2.len(), 2);
+    let enroll_matrix = make_matrix(&enroll_list, students.len(), c2.len(), Config::ENROLL);
     (enroll_matrix, c2)
 }
 
@@ -129,7 +129,7 @@ fn admission
     ).collect::<Vec<Student>>();
 
     // 入学者sparseマトリクス　行=大学、列=受験生、値４(入学) を作成
-    let admission_matrix = make_matrix(&admission_list, colleges.len(), s2.len(), 4);
+    let admission_matrix = make_matrix(&admission_list, colleges.len(), s2.len(), Config::ADMISSION);
     (admission_matrix, s2)
 }
 
