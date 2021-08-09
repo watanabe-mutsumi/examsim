@@ -120,20 +120,20 @@ impl Student {
                 Some(passed_ids[0])
             },
             _ => { // 国公立(institute=1or2)があればそこに入学、なければ最も偏差値の高い大学を選択
-                let mut passed_colleges: Vec<(&Cid, i32, u8)> = passed_ids.into_iter()
-                    .map(|x| (x, colleges[*x].score, colleges[*x].institute))
+                let mut passed_colleges: Vec<College> = passed_ids.into_iter()
+                    .map(|x| colleges[*x].clone())
                     .collect();
-                passed_colleges.sort_unstable_by(|a, b| b.1.cmp(&a.1));
-                let national_public: Vec<(&Cid, i32, u8)> = passed_colleges.clone().into_iter()
-                    .filter(|x| x.2 < 3)
+                passed_colleges.sort_unstable_by(|a, b| b.score.cmp(&a.score));
+                let national_public: Vec<College> = passed_colleges.clone().into_iter()
+                    .filter(|x| x.institute < Config::PRIVATE)
                     .collect();
                 let seletcted = if let 0 = national_public.len() {
-                    passed_colleges[0].0
+                    passed_colleges[0].index
                 } else {
-                    national_public[0].0
+                    national_public[0].index
                 };
-                self.admission = Some(*seletcted);
-                Some(*seletcted)
+                self.admission = Some(seletcted);
+                Some(seletcted)
             },
         }
     }
