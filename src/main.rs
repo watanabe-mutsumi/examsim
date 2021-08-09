@@ -8,7 +8,7 @@ use sprs::{TriMat, CsMatBase};
 use sprs::io::write_matrix_market;
 use std::time::Instant;
 use chrono::Local;
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 use crate::college::{College, Cid};
 use crate::student::{Student, Sid};
@@ -19,12 +19,14 @@ pub type Matrix = CsMatBase<u8, usize, Vec<usize>, Vec<usize>, Vec<u8>, usize>;
 pub fn main() -> Result<()>{
 
     let begin = Instant::now();
-    println!("大学受験シミュレーション");
+    println!("大学受験シミュレーション　Ver. 1.0");
     println!("開始 {}",Local::now());
 
+    // 設定ファイルからグローバルなConfigオブジェクトを作成
     // Config::from_args()?;
     Config::from_path("config01.toml")?;
 
+    //Step:0 大学エージェントと学生（受験生）エージェントを作成
     let colleges: Vec<College> = College::from_conf(&Config::get())?;
     let students: Vec<Student> = Student::from_conf(&Config::get());
     
@@ -34,13 +36,11 @@ pub fn main() -> Result<()>{
     //Step:2 合否判定（大学行動）
     let (enroll_matrix, mut colleges) = enroll(colleges, &students, &apply_matrix);
 
-    //Step:2 入学先決定（学生行動）
+    //Step:3 入学先決定（学生行動）
     let (admisson_matrix, mut students) = admission(students, &colleges, &enroll_matrix);
 
-    let tran_enroll_matrix = enroll_matrix.transpose_into();
-    let temp_matrix = &apply_matrix + &tran_enroll_matrix;
-    let result_matrix = &temp_matrix + &admisson_matrix;
-    write_matrix_market(&"test_sparse.mm", &result_matrix)?;
+    //Step:4 シミュレーション結果をファイルに保存
+    save(&apply_matrix, enroll_matrix, &admisson_matrix)?;
 
 
     println!("colleges len:{:?}", colleges.len());
@@ -138,4 +138,14 @@ fn make_matrix(list: &[(usize, usize)], rows: usize, cols: usize, value: u8) -> 
     let mut trimat = TriMat::new((rows, cols));
     list.iter().for_each(|(row, col)| trimat.add_triplet(*row, *col, value));
     trimat.to_csr()
+}
+
+//シミュレーション結果をファイルに保存
+fn save(apply_matrix: &Matrix, enroll_matrix: Matrix, admisson_matrix: &Matrix) -> Result<()>{
+    let filename = &"test_sparse.mm";
+    let tran_enroll_matrix = enroll_matrix.transpose_into();
+    let temp_matrix = apply_matrix + &tran_enroll_matrix;
+    let result_matrix = &temp_matrix + admisson_matrix;
+    write_matrix_market(filename, &result_matrix)
+        .context( format!("Matrix file {} can not save.", filename))
 }
