@@ -7,6 +7,9 @@ student_number = 560_000
 #乱数シード初期値 u64
 random_seed = 42
 
+#データ出力先
+output_dir = "./output"
+
 #ランク別大学グループの偏差値上限と下限
 #自分の偏差値+lower 〜　自分の偏差値+upper
 # 0:（チャレンジ校） 1:（本命校） 2:（安全校）

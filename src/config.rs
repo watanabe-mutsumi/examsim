@@ -1,10 +1,11 @@
 use std::process::exit;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{App, Arg, crate_version};
 use std::fs;
 use std::io::Read;
 use serde::Deserialize;
 use once_cell::sync::OnceCell;
+use chrono::Local;
 
 // グローバルな設定情報オブジェクト
 pub static CONFIG: OnceCell<Config> = OnceCell::new();
@@ -16,6 +17,7 @@ pub struct Config{
     pub initial_college_csv: String,
     pub student_number: usize,
     pub random_seed: u64,
+    pub output_dir: String,
 
     pub college_rank_lower: [i32; 3],
     pub college_rank_upper: [i32; 3],
@@ -87,5 +89,14 @@ impl Config {
     // 生成済みのConfigオブジェクトを返す
     pub fn get() -> &'static Config{
         CONFIG.get().expect("Not initalized Config")
+    }
+
+    //データ出力ディレクトリを生成し、その相対パス名を返す。
+    pub fn get_output_dirname() -> Result<String>{
+        let new_dir = Config::get().output_dir.clone() + "/" + &Local::now().format("%Y%m%d%H%M%S").to_string();
+        match fs::create_dir(new_dir.clone()).context("dir cannot create"){
+            Err(e) => Err(e),
+            Ok(_) => Ok(new_dir + "/"),
+        }
     }
 }
