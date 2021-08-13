@@ -17,8 +17,10 @@ pub struct Config{
     pub initial_college_csv: String,
     pub student_number: usize,
     pub random_seed: u64,
+    pub output_dir_base: String,
     pub output_dir: String,
 
+    pub national_range: [i32; 2],
     pub college_rank_lower: [i32; 3],
     pub college_rank_upper: [i32; 3],
     pub college_rank_select_number: [usize; 3],
@@ -66,7 +68,8 @@ impl Config {
             println!("設定ファイルは{:?}です。", filename);
             let mut contents = String::new();
             f.read_to_string(&mut contents).expect("config file read error");
-            let cfg: Config = toml::from_str(&contents).unwrap();
+            let mut cfg: Config = toml::from_str(&contents).unwrap();
+            cfg.output_dir = Config::get_output_dirname(& cfg)?;
             CONFIG.set(cfg).unwrap();
             Ok(())
         } else {
@@ -81,7 +84,8 @@ impl Config {
         println!("設定ファイルは{:?}です。", path);
         let mut contents = String::new();
         f.read_to_string(&mut contents).expect("config file read error");
-        let cfg: Config = toml::from_str(&contents).unwrap();
+        let mut cfg: Config = toml::from_str(&contents).unwrap();
+        cfg.output_dir = Config::get_output_dirname(& cfg)?;
         CONFIG.set(cfg).unwrap();
         Ok(())
     }
@@ -92,8 +96,8 @@ impl Config {
     }
 
     //データ出力ディレクトリを生成し、その相対パス名を返す。
-    pub fn get_output_dirname() -> Result<String>{
-        let new_dir = Config::get().output_dir.clone() + "/" + &Local::now().format("%Y%m%d%H%M%S").to_string();
+    pub fn get_output_dirname(conf: &Config) -> Result<String>{
+        let new_dir = conf.output_dir_base.clone() + "/" + &Local::now().format("%Y%m%d%H%M%S").to_string();
         match fs::create_dir(new_dir.clone()).context("dir cannot create"){
             Err(e) => Err(e),
             Ok(_) => Ok(new_dir + "/"),

@@ -31,8 +31,11 @@ pub fn main() -> Result<()>{
     let students: Vec<Student> = Student::from_conf(&Config::get());
     println!("0: 初期化完了&シミュレーション開始 {:?}",begin.elapsed());
 
+    //国公立と私立大学に分けたベクターを用意
+    let (nationals, privates) = divide_colleges(&colleges);
+
     //Step:1 出願 & 試験（学生行動）
-    let (apply_matrix, mut students) = apply(students, &colleges);
+    let (apply_matrix, mut students) = apply(students, &nationals, &privates);
     
     //Step:2 合否判定（大学行動）
     let (enroll_matrix, mut colleges) = enroll(colleges, &students, &apply_matrix);
@@ -47,22 +50,27 @@ pub fn main() -> Result<()>{
 
     println!("colleges len:{:?}", colleges.len());
     println!("studnets len:{:?}", students.len());
+    println!("nationals len:{:?}", nationals.len());
+    println!("privates len:{:?}", privates.len());
 
     let sid = 56_000;
     println!("students[56_000] {:?}", students[sid]);
-    let (bounds, selection) = students[sid].apply(&Config::get(), &colleges);
+    let (bounds, selection) = students[sid].apply(&Config::get(), &nationals, &privates);
     println!("bounds:{:?}",bounds);
     println!("selection:{:?}",selection);
     let sid = 0;
     println!("students[0] {:?}", students[sid]);
-    let (bounds, selection) = students[sid].apply(&Config::get(), &colleges);
+    let (bounds, selection) = students[sid].apply(&Config::get(),&nationals, &privates);
     println!("bounds:{:?}",bounds);
     println!("selection:{:?}",selection);
     let sid = 559_999;
     println!("students[559_999] {:?}", students[sid]);
-    let (bounds, selection) = students[sid].apply(&Config::get(), &colleges);
+    let (bounds, selection) = students[sid].apply(&Config::get(), &nationals, &privates);
     println!("bounds:{:?}",bounds);
     println!("selection:{:?}",selection);
+
+    println!("{:?}",colleges[77]);
+    println!("{:?}",colleges[737]);
 
     println!("終了 {}",Local::now());
     println!("elaspled:{:?}", begin.elapsed());
@@ -70,14 +78,14 @@ pub fn main() -> Result<()>{
 }
 
 // 大学選択　＆　受験
-fn apply(students: Vec<Student>, colleges: &[College]) -> (Matrix, Vec<Student>){
+fn apply(students: Vec<Student>, nationals: &[College], privates: &[College]) -> (Matrix, Vec<Student>){
     let mut apply_list: Vec<(usize, usize)> = Vec::new();
     let s2 = students.into_par_iter()
         .mapfold_reduce_into(
         &mut apply_list,
         |acc, mut x|{
             let idx = x.id;
-            let (_, entries) = x.apply(&Config::get(), colleges);
+            let (_, entries) = x.apply(&Config::get(), nationals, privates);
             for college_idx in entries { acc.push((college_idx, idx));}
             x
         },
@@ -86,7 +94,7 @@ fn apply(students: Vec<Student>, colleges: &[College]) -> (Matrix, Vec<Student>)
     ).collect::<Vec<Student>>();
 
     // 出願sparseマトリクス　行=大学、列=受験生、値1(出願) を作成
-    let apply_matrix = make_matrix(&apply_list, colleges.len(), s2.len(), Config::APPLY);
+    let apply_matrix = make_matrix(&apply_list, nationals.len() + privates.len(), s2.len(), Config::APPLY);
     (apply_matrix, s2)
 }
 
@@ -144,10 +152,21 @@ fn make_matrix(list: &[(usize, usize)], rows: usize, cols: usize, value: u8) -> 
 
 //シミュレーション結果をファイルに保存
 fn save(apply_matrix: &Matrix, enroll_matrix: Matrix, admisson_matrix: &Matrix) -> Result<()>{
-    let filename = Config::get_output_dirname()? + "result.mm";
+    let filename = Config::get().output_dir.clone() + "result.mm";
     let tran_enroll_matrix = enroll_matrix.transpose_into();
     let temp_matrix = apply_matrix + &tran_enroll_matrix;
     let result_matrix = &temp_matrix + admisson_matrix;
     write_matrix_market(filename.clone(), &result_matrix)
         .context( format!("Matrix file {} can not save.", filename))
+}
+
+//国公立と私立を分ける
+fn divide_colleges(colleges: &[College]) -> (Vec<College>, Vec<College>){
+    let privates: Vec<College> = colleges.iter().cloned()
+        .filter(|x| x.institute == Config::PRIVATE)
+        .collect();
+    let nationals: Vec<College> = colleges.iter().cloned()
+        .filter(|x| x.institute != Config::PRIVATE)
+        .collect();
+    (nationals, privates)
 }

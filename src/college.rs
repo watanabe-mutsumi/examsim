@@ -38,7 +38,7 @@ impl College {
             college.score = (college.dev * 1000.0).round() as i32;
             colleges.push(college);
         }
-        // 偏差値の高い順にソート
+        // 偏差値の昇順にソート
         colleges.par_sort_unstable_by(|a, b| a.score.cmp(&b.score));
         for i in 0..colleges.len() {colleges[i].index = i}
         Ok(colleges)    

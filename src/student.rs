@@ -43,7 +43,7 @@ impl Student {
             .into_iter()
             .map(|x| Student::new(x, &mut rng1))
             .collect();
-        students.par_sort_unstable_by(|a, b| b.score.cmp(&a.score));
+        students.par_sort_unstable_by(|a, b| a.score.cmp(&b.score));
         students.into_par_iter()
             .enumerate()
             .map(|(i, mut x)| {x.id = i; x})
@@ -53,25 +53,48 @@ impl Student {
     // ランク別の大学グループを作成し、各グループから受験大学を選択して出願＆受験する。
     // ランクの範囲、数、各ランクから何校選ぶかはconfigの設定に従う。
     // 試験結果として誤差を加えた自分の偏差値を大学インデックスをキーとしたMapに保存する。
-    pub fn apply(&mut self, conf: &Config, colleges: &[College]) -> (Vec<(usize, usize)>, Vec<Cid>){
+    pub fn apply(&mut self, conf: &Config, nationals: &[College], privates: &[College]) -> (Vec<(usize, usize)>, Vec<Cid>){
+        // 1:まず国公立を１校選択
+        let national = self.from_nationals(conf, nationals);
+        // 2:私立大学から複数選択
         let rank_num = conf.college_rank_lower.len();
         let bounds: Vec<(usize, usize)> = (0..rank_num).into_iter()
-            .map(|i| self.get_bounds(conf.college_rank_lower[i], conf.college_rank_upper[i], colleges))
+            .map(|i| self.get_bounds(conf.college_rank_lower[i], conf.college_rank_upper[i], privates))
             .collect();
         // println!("inner:bounds:{:?}",bounds);
-        let c_vec: Vec<Cid> = (0..rank_num).into_iter()
-            .map(|i| self.select_college(bounds[i], conf.college_rank_select_number[i]))
+        let mut c_vec: Vec<Cid> = (0..rank_num).into_iter()
+            .map(|i| self.select_college(conf, privates, bounds[i], conf.college_rank_select_number[i]))
             .flatten()
             .collect::<HashSet<Cid>>() //一旦Setにして重複を削除
             .into_iter()
             .collect();
-        //大学毎の試験成績を記録
+        // 3:国公立があれば配列に追加
+        if let Some(n) = national{
+            c_vec.push(n);
+        }
+        // 4:大学毎の試験成績を記録
         c_vec.iter().for_each(|c_idx| {
             let exam_result = self.exam();
             self.c_map.insert(*c_idx, exam_result);
         });
         (bounds, c_vec)
     }
+
+    // 国公立大学から1校選択
+    pub fn from_nationals(&mut self, conf: &Config, nationals: &[College]) -> Option<Cid>{
+        let bounds: (usize, usize) = self.get_bounds(conf.national_range[0], conf.national_range[1], nationals);
+        // println!("inner:bounds:{:?}",bound);
+        match bounds{
+            // 偏差値に合う国公立なし
+            (0, 0) => None,
+            _ => {// 大学グループから一様分布で1数だけ大学を選択
+                let size = (bounds.1 as i32) - (bounds.0 as i32) + 1;
+                let idx = sample(&mut self.rng, size as usize, 1).index(0);
+                Some(nationals[idx + bounds.0].index)
+            }
+        }
+    }
+
 
     // 大学ランク別グループの下限と上限（配列のインデックス）を返す。
     fn get_bounds(&self, lower: i32, upper: i32, colleges: &[College]) -> (usize, usize){
@@ -87,8 +110,8 @@ impl Student {
         (lower, upper)
     }
 
-    // 大学ランク別グループから、configでグループ別に指定された数だけ出願校を選択する。
-    fn select_college(&mut self, bound: (usize, usize), select_number: usize) -> Vec<usize>{
+    // 私立大学ランク別グループから、configでグループ別に指定された数だけ出願校を選択する。
+    fn select_college(&mut self, conf: &Config, colleges: &[College], bound: (usize, usize), select_number: usize) -> Vec<usize>{
         let mut v: Vec<usize> = Vec::new();
         let size = (bound.1 as i32) - (bound.0 as i32) + 1;
         //上限と下限が同値、1校しかなかった場合、
@@ -103,7 +126,8 @@ impl Student {
                 .iter()
                 .map(|x| x + bound.0).collect();
         }
-        v
+        //私立大学配列上のインデクスから、その先の大学全体のインデックスに変換してから値を返す
+        v.iter().map(|x| colleges[*x].index).collect()
     }
 
     // 入学試験。自分の偏差値 + 標準正規分布誤差を返す。
