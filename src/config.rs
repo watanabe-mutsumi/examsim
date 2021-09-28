@@ -36,7 +36,7 @@ impl Config {
 
     //大学入試結果resultマトリクス集計時の意味
     pub const R_FAILED: u8 = 1;  //不合格
-    pub const R_PASSED: u8 = 3;  //合格
+    pub const R_PASSED: u8= 3;  //合格
     pub const R_ADMISSION: u8 = 7; //入学
 
     //大学設定区分
@@ -65,7 +65,7 @@ impl Config {
 
         if let Some(filename) = matches.value_of("CONFIG_FILE") {
             let mut f = fs::File::open(filename).expect("config toml file not found");
-            println!("設定ファイルは{:?}です。", filename);
+            eprintln!("設定ファイル = {:?}", filename);
             let mut contents = String::new();
             f.read_to_string(&mut contents).expect("config file read error");
             let mut cfg: Config = toml::from_str(&contents).unwrap();
@@ -73,7 +73,7 @@ impl Config {
             CONFIG.set(cfg).unwrap();
             Ok(())
         } else {
-            println!("設定ファイル名が指定されていません。");
+            eprintln!("設定ファイル名が指定されていません。");
             exit(1)
         }
     }
@@ -81,7 +81,7 @@ impl Config {
     // Configオブジェクト生成。　関数引数に直接指定された設定ファイル名から。
     pub fn from_path(path: &str) -> Result<()>{
         let mut f = fs::File::open(path).expect("config toml file not found");
-        println!("設定ファイルは{:?}です。", path);
+        eprintln!("設定ファイルは{:?}です。", path);
         let mut contents = String::new();
         f.read_to_string(&mut contents).expect("config file read error");
         let mut cfg: Config = toml::from_str(&contents).unwrap();

@@ -1,5 +1,5 @@
 use rayon::prelude::*;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use anyhow::Result;
 use csv::ReaderBuilder;
 use std::cmp::min;
@@ -29,6 +29,7 @@ pub struct College{
     // #[serde(default = "crate::college::default_rng")]
     // pub rng: dyn SeedableRng,
 }
+
 impl College {
     pub fn from_conf(conf: &Config) -> Result<Vec<Self>>{
         let mut colleges: Vec<College> = Vec::new();
@@ -67,7 +68,7 @@ impl College {
         let own_scale = self.college_scale();
         // 暫定: 2016(0)以前と2016(1)の増減率を取得。本当は毎年変わる。
         let limit_change_rate = 
-            Config::MAX_ENROLLMENT_RATES[0][own_scale]/Config::MAX_ENROLLMENT_RATES[1][own_scale];
+            Config::MAX_ENROLLMENT_RATES[1][own_scale]/Config::MAX_ENROLLMENT_RATES[0][own_scale];
         ((self.enroll as f64) * self.over_rate * limit_change_rate).ceil() as usize
     }
 
@@ -79,6 +80,26 @@ impl College {
     
 }
 
-// pub fn default_rng() -> Xoshiro256StarStar{
-//     Xoshiro256StarStar::seed_from_u64(0)
-// }
+// シミュレーション結果CSV
+#[derive(Debug, Default, Clone, Serialize)]
+pub struct CollegeResult{
+    //基本情報　初期値から不変
+    pub index: usize, //偏差値昇順ソート後の連番。配列のインデックス
+    pub cid: Cid, //旺文社の大学番号
+    pub name: String,  //  大学名
+    pub institute: u8, // 設置区分：1国立 2公立 3私立
+    pub dev: f64, // 偏差値
+    pub enroll: u32, //　入学定員数
+    pub over_rate: f64, //合格者超過率
+
+    //シミュレーション結果
+    pub apply_count: usize, //受験者数
+    pub enroll_1st_count: usize, //正規合格数
+    pub enroll_sup_count: usize, //追加合格数
+    pub paid_only_count: usize, //入学金納付のみ
+    pub payments: usize, //入学金徴収総額
+    pub addmissons: usize, //最終入学者数
+    pub new_deviation: f64, //入学者偏差値平均
+    pub new_over_rate: f64, //新合格者超過率
+    pub admisson_over_rate: f64, //入学定員超過率 
+}

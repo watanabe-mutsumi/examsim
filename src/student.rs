@@ -87,10 +87,14 @@ impl Student {
         match bounds{
             // 偏差値に合う国公立なし
             (0, 0) => None,
-            _ => {// 大学グループから一様分布で1数だけ大学を選択
+            _ => {// 大学グループから一様分布で1校だけ大学を選択
                 let size = (bounds.1 as i32) - (bounds.0 as i32) + 1;
-                let idx = sample(&mut self.rng, size as usize, 1).index(0);
-                Some(nationals[idx + bounds.0].index)
+                if size <= 1 {
+                    Some(nationals[bounds.0].index)
+                } else {
+                    let idx = sample(&mut self.rng, size as usize, 1).index(0);
+                    Some(nationals[idx + bounds.0].index)
+                }
             }
         }
     }
@@ -142,7 +146,7 @@ impl Student {
             1 => { // 暫定。1校しか合格しなかったのでそこに入学
                 self.admission = Some(passed_ids[0]);
                 Some(passed_ids[0])
-            },
+                },
             _ => { // 国公立(institute=1or2)があればそこに入学、なければ最も偏差値の高い大学を選択
                 let mut passed_colleges: Vec<College> = passed_ids.into_iter()
                     .map(|x| colleges[*x].clone())
@@ -163,18 +167,3 @@ impl Student {
     }
 
 }
- 
-// #[test]
-// fn test_apply() -> Result<()>{
-//     Config::from_path("config01.toml")?;
-
-//     let colleges: Vec<College> = College::from_conf(&Config::get())?;
-//     let students: Vec<Student> = Student::from_conf(&Config::get());
-
-//     println!("Collges 0:{:?}", colleges[0]);
-//     println!("Student 0:{:?}", students[0]);
-
-//     Ok(())
-// }
-
-

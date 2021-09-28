@@ -15,7 +15,7 @@ output_dir_base = "./output"
 output_dir = "."
 
 #国公立大学選択時の偏差値上限と下限
-national_range = [-3, 3]
+national_range = [-5, 5]
 
 #ランク別私立大学グループの偏差値上限と下限
 #自分の偏差値+lower 〜　自分の偏差値+upper
