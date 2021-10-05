@@ -1,3 +1,34 @@
+
+    let debug : bool = false;
+    if debug == true {
+        eprintln!("colleges len:{:?}", colleges.len());
+        eprintln!("studnets len:{:?}", students.len());
+        eprintln!("nationals len:{:?}", nationals.len());
+        eprintln!("privates len:{:?}", privates.len());
+
+        let sid = 56_000;
+        eprintln!("students[56_000] {:?}", students[sid]);
+        let (bounds, selection) = students[sid].apply(&Config::get(), &nationals, &privates);
+        eprintln!("bounds:{:?}",bounds);
+        eprintln!("selection:{:?}",selection);
+        let sid = 0;
+        eprintln!("students[0] {:?}", students[sid]);
+        let (bounds, selection) = students[sid].apply(&Config::get(),&nationals, &privates);
+        eprintln!("bounds:{:?}",bounds);
+        eprintln!("selection:{:?}",selection);
+        let sid = 559_999;
+        eprintln!("students[559_999] {:?}", students[sid]);
+        let (bounds, selection) = students[sid].apply(&Config::get(), &nationals, &privates);
+        eprintln!("bounds:{:?}",bounds);
+        eprintln!("selection:{:?}",selection);
+
+        eprintln!("{:?}",colleges[77]);
+        eprintln!("{:?}",colleges[737]);
+    }
+
+
+
+
 students[0] Student { id: 100905, score: 95371, c_vec: [], flg: 560000, rng: Xoshiro256StarStar { s: [3067308700193536694, 4573305493866406276, 2794037550489474366, 16407966112385597795] } }
 students[20_000] Student { id: 80919, score: 68103, c_vec: [], flg: 560000, rng: Xoshiro256StarStar { s: [13135190836611784335, 11398814178889667318, 2442753900207682303, 16953005594989113355] } }
 students[30_000] Student { id: 208069, score: 66146, c_vec: [], flg: 560000, rng: Xoshiro256StarStar { s: [2313825813703423168, 4400750755005345124, 14414088273384551795, 9842495298866273029] } }
