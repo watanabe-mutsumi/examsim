@@ -34,10 +34,10 @@ apply_pattern_rate = [1, 14, 85]
 
 #目標合格者総数中の追加合格の割合
 #  2021.10.04
-enroll_add_rate = 0.2
+enroll_add_rate = 0
 
 #追加合格時の偏差値下限。
 #  大学偏差値から幾ら下までを許容するか
-#  -1なら偏差値足切りなし
+#  0なら偏差値足切りなし
 #  2021.10.04
-enroll_add_lower = 3
+enroll_add_lower = 1000

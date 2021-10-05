@@ -40,4 +40,4 @@ enroll_add_rate = 0
 #  大学偏差値から幾ら下までを許容するか
 #  0なら偏差値足切りなし
 #  2021.10.04
-enroll_add_lower = 0
+enroll_add_lower = 3000

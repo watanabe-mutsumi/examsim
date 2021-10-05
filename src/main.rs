@@ -96,7 +96,7 @@ fn enroll1(colleges:&mut Vec<College>, students: &[Student], apply_mat: &Matrix)
         .fold_with(Vec::new(),
             |mut acc, x|{
                 let idx = x.index;
-                let entries = x.enroll1(students, apply_mat.outer_view(idx).unwrap().indices());
+                let entries = x.enroll1(Config::get(),students, apply_mat.outer_view(idx).unwrap().indices());
                 for student_idx in entries {acc.push((student_idx, idx));}
                 acc
         })
@@ -163,7 +163,7 @@ fn enroll3(colleges:&mut Vec<College>, students: &[Student], mat: &Matrix) -> Ma
         .fold_with(Vec::new(),
             |mut acc, x|{
                 let idx = x.index;
-                let entries = x.enroll3(students, mat, idx);
+                let entries = x.enroll3(Config::get(), students, mat, idx);
                 for student_idx in entries {acc.push((student_idx, idx));}
                 acc
         })

@@ -28,7 +28,12 @@ pub struct College{
     #[serde(default)]
     pub s_vec: Vec<Sid>, //一次合格した受験生のインデックス
     #[serde(default)]
-    pub new_enroll_num: usize, //今回の合格者総数最大値
+    pub new_enroll_num: usize, //今回の一次合格者総数最大値。私立用。
+    #[serde(default)]
+    pub add_enroll_num: usize, //今回の追加合格用人数。私立用。
+
+
+
     // #[serde(default = "crate::college::default_rng")]
     // pub rng: dyn SeedableRng,
 }
@@ -49,9 +54,14 @@ impl College {
     }
 
     //私立一次合格者決定 
-    pub fn enroll1(&mut self, students: &[Student], candidates: &[usize]) -> Vec<Sid>{
+    pub fn enroll1(&mut self, conf: &Config, students: &[Student], candidates: &[usize]) -> Vec<Sid>{
         // 1.前年度実績と今年度入学定員制限から合格者数を決定。
         self.new_enroll_num = self.enroll_num();
+        // 追加合格用人数を設定
+        self.add_enroll_num = (self.new_enroll_num as f64 * conf.enroll_add_rate).round() as usize;
+        self.new_enroll_num -=  self.add_enroll_num; //追加合格分を引く
+        // eprintln!("add_enroll_num:{:?}", self.add_enroll_num);
+
         // ２。受験者の配列を取得。
         let mut id_and_scores: Vec<(&usize, &i32)> = candidates.into_iter()
             .map(|x| (x, students[*x].c_map.get(&self.index).unwrap()))
@@ -85,7 +95,7 @@ impl College {
     }
 
     //私立追加合格者決定 
-    pub fn enroll3(&mut self, students: &[Student], matrix: &Matrix, idx: usize) -> Vec<Sid>{
+    pub fn enroll3(&mut self, conf: &Config, students: &[Student], matrix: &Matrix, idx: usize) -> Vec<Sid>{
         // 1.現在の入学者数を計算
         let statuss: Vec<(usize,u8)> = matrix.outer_view(idx).unwrap().indices().into_iter()
             .map(|col| (*col, *matrix.get(idx, *col).unwrap()))
@@ -96,8 +106,20 @@ impl College {
             .collect::<Vec::<&u8>>()
             .len();
         
-        let diff = self.enroll as usize - current_admisson_num;
+        let diff = if current_admisson_num > self.enroll as usize{
+                0 as usize
+            }else{
+                self.enroll as usize - current_admisson_num
+            };
         if  diff > 0 { //不足
+            //差分に追加合格用人数を上乗せ
+            let limit = diff + self.add_enroll_num;
+            //偏差値足切り値
+            let limit_score = if conf.enroll_add_lower == 0{
+                    0 //偏差値足切りなし
+                }else{
+                    self.score  - conf.enroll_add_lower
+                };
             // ２。受験者のうち、未だ合格させていない者から追加合格者候補リストを作成
             let mut id_and_scores: Vec<(&usize, &i32)> = statuss.iter()
                 .filter(|(_, val)| *val == Config::R_FAILED)
@@ -106,7 +128,9 @@ impl College {
             //3.成績の良い順に合格者を決定
             id_and_scores.sort_unstable_by(|a, b| b.1.cmp(a.1));
             // println!("Coll idx: {:?} enroll_num:{:?} id&score.len :{:?}", self.index, enroll_num, id_and_scores.len());
-            let s_vec = (0..min(id_and_scores.len(), diff)).into_iter()
+            let s_vec = (0..min(id_and_scores.len(), limit)).into_iter()
+                // 2021.10.5 偏差値による足切り
+                .filter(|x| *(id_and_scores[*x].1) >= limit_score)
                 .map(|x|*(id_and_scores[x].0)).collect::<Vec<Sid>>();
             s_vec
         } else {
