@@ -8,10 +8,10 @@ use std::time::Instant;
 use std::collections::HashMap;
 use std::io::stdout;
 use chrono::Local;
-use anyhow::{Result};
+use anyhow::Result;
 
 use crate::college::{College, Cid, CollegeResult};
-use crate::student::{Student, Sid, ApplyPattern};
+use crate::student::{ApplyPattern, Sid, Student, StudentResult};
 use crate::config::Config;
 
 pub type Matrix = CsMatBase<u8, usize, Vec<usize>, Vec<usize>, Vec<u8>, usize>;
@@ -25,12 +25,44 @@ pub fn main() -> Result<()>{
 
     // 設定ファイルからグローバルなConfigオブジェクトを作成
     Config::from_args()?;
-    // Config::from_path("config01.toml")?;
 
-    //Step:0 大学エージェントと学生（受験生）エージェントを作成
-    let mut colleges: Vec<College> = College::from_conf(&Config::get())?;
-    let mut students: Vec<Student> = Student::from_conf(&Config::get());
-    eprintln!("    0: 初期化完了&シミュレーション開始 \t{:?}",begin.elapsed());
+    //シミュレーション実行
+    run(&Config::get(), &begin)?;
+
+    eprintln!("終了 {}",Local::now());
+    eprintln!("elaspled:{:?}", begin.elapsed());
+    Ok(())
+}
+
+//main loop
+fn run(conf: &Config, timer: &Instant) -> Result<()>{
+    //大学エージェント初期値
+    let mut colleges: Vec<College> = College::from_conf(conf)?;
+
+    //シミュレーション実行
+    for epoch in 0..conf.epochs{
+        eprintln!("    epoch[{:02}]:start \t{:?}",epoch, timer.elapsed());
+        //1回分のシミュレーション実行
+        match step(epoch, &mut colleges, conf){
+            Ok((new_colls,college_result, student_result)) =>{
+                colleges = new_colls;
+                //シミュレーション結果出力。大学側集計結果を標準出力にCSV形式で出力
+                //デバッグ用に学生単位の結果をoutput用フォルダーにCSV形式で保存
+                output_result(epoch, &college_result, &student_result)?;
+                },
+            Err(e) => eprintln!("step error epoch=[{:02}] msg=[{:?}]",epoch, e),
+        }
+    }
+
+    Ok(())
+}
+
+// シミュレーション1回分実行
+fn step(epoch: i32, colleges: &mut Vec<College>, conf: &Config)
+    ->Result<(Vec<College>, Vec<CollegeResult>, Vec<StudentResult>)>{
+    
+    //Step:0 受験生エージェントを作成
+    let mut students: Vec<Student> = Student::from_conf(conf);
 
     //国公立と私立大学に分けたベクターを用意
     let (nationals, privates) = divide_colleges(&colleges);
@@ -39,34 +71,33 @@ pub fn main() -> Result<()>{
     let apply_matrix = apply(&mut students, &nationals, &privates);
    
     //Step:2 私立一次合格発表（大学行動）
-    let enroll1_matrix = enroll1(&mut colleges, &students, &apply_matrix);
+    let enroll1_matrix = enroll1(colleges, &students, &apply_matrix);
 
     //Step:3 入学判定１回目（学生行動）
     let adm1_matrix  = admission1(&mut students, &colleges, &enroll1_matrix);
 
     //Step:4 国公立合格発表（大学行動）
-    let enroll2_matrix = enroll2(&mut colleges, &students, &apply_matrix);
+    let enroll2_matrix = enroll2(colleges, &students, &apply_matrix);
 
     //状態遷移マトリクス集計
-    let temp1 = &apply_matrix + &(enroll1_matrix.transpose_into());
-    let status1 = &temp1 + &adm1_matrix;
+    let status = &apply_matrix + &(enroll1_matrix.transpose_into());
+    let status = &status + &adm1_matrix;
 
     //Step:5 私立追加合格発表（大学行動）
-    let enroll3_matrix = enroll3(&mut colleges, &students, &status1);
+    let enroll3_matrix = enroll3(colleges, &students, &status);
 
     //状態遷移マトリクス集計
-    let temp2 = &enroll2_matrix  + &(status1.transpose_into());
-    let status2 = &temp2 + &enroll3_matrix;
+    let status = &enroll2_matrix  + &(status.transpose_into());
+    let status = &status + &enroll3_matrix;
 
     //Step:6 入学先最終決定（学生行動）
-    let adm2_matrix  = admission2(&mut students, &colleges, &status2);
-    eprintln!("    1: シミュレーション完了&データ保存開始 \t{:?}",begin.elapsed());
+    let adm2_matrix  = admission2(&mut students, &colleges, &status);
 
-    //Step:4 シミュレーション結果を標準出力にCSV形式で出力
-    print_result(&students, &colleges, status2, &adm2_matrix)?;
-    eprintln!("終了 {}",Local::now());
-    eprintln!("elaspled:{:?}", begin.elapsed());
-    Ok(())
+    //状態遷移マトリクス集計
+    let status = &adm2_matrix + &(status.transpose_into());
+    
+    //シミュレーション結果を集計し、次step用大学オブジェクトと集計結果を生成
+    settle(epoch, &students, &colleges, status)
 }
 
 // 大学選択　＆　受験
@@ -215,20 +246,20 @@ fn make_matrix_any_value(list: &[(usize, SidStatus)], rows: usize, cols: usize) 
 }
 
 
-//シミュレーション結果をstdoutにCSV形式で出力
-fn print_result(students: &Vec<Student>, colleges: &Vec<College>, status: Matrix, adm2: &Matrix) -> Result<()>{
-    
-    let tran_matrix = status.transpose_into();
-    let result_matrix = adm2 + &tran_matrix ;
+//シミュレーション結果を集計し、次step用大学オブジェクトと集計結果を生成
+fn settle(epoch: i32, students: &Vec<Student>, colleges: &Vec<College>, status: Matrix)
+    ->Result<(Vec<College>, Vec<CollegeResult>, Vec<StudentResult>)>{
 
-    let mut wtr = csv::Writer::from_writer(stdout());
+    let mut new_colleges: Vec<College> = Vec::new();
+    let mut college_results: Vec<CollegeResult> = Vec::new();
+    let mut student_map = HashMap::new();
 
-    for x in colleges{
+    for x in colleges {
         let mut new_dev: f64 = 0.0; //入学者の偏差値合計
         let mut counters = HashMap::new();
-        let values = result_matrix.outer_view(x.index).unwrap().indices().iter()
+        let values = status.outer_view(x.index).unwrap().indices().iter()
             .map(|col|{
-                if let Some(val) = result_matrix.get(x.index, *col){
+                if let Some(val) = status.get(x.index, *col){
                     //状態値別に件数を集計
                     let counter = counters.entry(*val).or_insert(0);
                     *counter += 1;
@@ -241,24 +272,33 @@ fn print_result(students: &Vec<Student>, colleges: &Vec<College>, status: Matrix
                         },
                         _ => (),
                     }
-                    Some(*val)
+                    Some( (*col,*val) )
                 }else{
                     None
                 }
-            }).collect::<Vec<Option<u8>>>();
-        
+            }).collect::<Vec<Option<(Sid, u8)>>>();
+
+        //
+        // //学生別ログ出力用ハッシュマップ作成。key=Sid, value=Vec<(Cid,status)>
+        values.iter().for_each(|v|{
+            if let Some((sid, val)) = v{
+                let c_vec = student_map.entry(*sid).or_insert(Vec::new());
+                c_vec.push((x.index, *val));
+
+            }
+        });
         //件数集計
         //一次合格者数
         let enroll_1st_count = count(&values, Config::ENROLL_1ST) + 
-                           count(&values, Config::ENROLL_2ND);
-         //追加合格者数
+                            count(&values, Config::ENROLL_2ND);
+            //追加合格者数
         let enroll_add_count = count(&values, Config::ENROLL_3RD);
 
         //一次合格入学者数
         let admission_1st_count = count_eq(&counters, &Config::R_ADMISSION_1ST) +
-                              count_eq(&counters, &Config::R_ADMISSION_2ND);
+                                count_eq(&counters, &Config::R_ADMISSION_2ND);
 
-         //一次合格保留後入学者数
+            //一次合格保留後入学者数
         let admission_rsv_count = count_eq(&counters, &Config::R_ADMISSION_RSV);
 
         //追加合格入学者数
@@ -270,7 +310,9 @@ fn print_result(students: &Vec<Student>, colleges: &Vec<College>, status: Matrix
         //入学者総数
         let admissons_all = admission_1st_count + admission_rsv_count + admission_add_count;
 
-        wtr.serialize(CollegeResult {
+        //大学集計結果オブジェクト作成
+        let college_result = CollegeResult{
+            epoch: epoch,
             index: x.index, //偏差値昇順ソート後の連番。配列のインデックス
             cid: x.cid, //旺文社の大学番号
             name: x.name.clone(),  //  大学名
@@ -294,10 +336,44 @@ fn print_result(students: &Vec<Student>, colleges: &Vec<College>, status: Matrix
             admissons: admissons_all, //最終入学者数
             new_deviation: new_dev / admissons_all as f64, //入学者偏差値平均
             payments: admissons_all + paid_only_count, //入学金徴収総額
-        })?;
+        };
+
+        //次エポック用大学エージェント作成
+        new_colleges.push(x.update(&college_result));
+        //大学入試結果
+        college_results.push(college_result);
     };
 
+    //大学を偏差値順にソート
+    new_colleges.par_sort_unstable_by(|a, b| a.score.cmp(&b.score));
+    //index振り直し
+    for i in 0..new_colleges.len() {new_colleges[i].index = i}
+
+    //受験生入試結果生成
+    let student_results = student::settle(epoch, students, &mut student_map);
+
+    Ok((new_colleges, college_results, student_results))
+}
+
+
+
+//シミュレーション結果を出力
+fn output_result(epoch: i32, college_results: &Vec<CollegeResult>, student_results: &Vec<StudentResult>) -> Result<()>{
+    //大学側結果を標準出力にCSVで出力
+    let mut wtr = csv::Writer::from_writer(stdout());
+    for c in college_results{
+        wtr.serialize(c)?;
+    }
     wtr.flush()?;
+
+    //学生側結果を指定フォルダーに保存
+    let path = format!("{}/result{:02}.csv", Config::get().output_dir, epoch);
+    let mut wtr = csv::Writer::from_path(path).unwrap();
+    for s in student_results{
+        wtr.serialize(s)?;
+    }
+    wtr.flush()?;
+
     Ok(())
 }
 
@@ -322,8 +398,8 @@ fn count_eq(m: &HashMap<u8, i32>, key: &u8) -> i32{
 }
 
 //bitマップ＆で一致する個数を取得する
-fn count(values: &[Option<u8>], key: u8) -> i32{
-    let v: Vec<u8> = values.iter().map(|x| x.unwrap())
+fn count(values: &[Option<(Sid, u8)>], key: u8) -> i32{
+    let v: Vec<u8> = values.iter().map(|x| x.unwrap().1)
         .filter(|x| x & key != 0).collect();
     v.len() as i32
 }

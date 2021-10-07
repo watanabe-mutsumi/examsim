@@ -11,6 +11,7 @@ use rand_xoshiro::rand_core::SeedableRng;
 use rand_xoshiro::Xoshiro256StarStar;
 use superslice::Ext;
 use std::collections::{HashSet, HashMap};
+use serde::Serialize;
 
 pub type Sid = usize; //学生ID
 
@@ -94,7 +95,7 @@ impl Student {
                     .collect();
                 // println!("inner:bounds:{:?}",bounds);
                 c_vec = (0..rank_num).into_iter()
-                    .map(|i| self.select_college(conf, privates, bounds[i], conf.college_rank_select_number[i]))
+                    .map(|i| self.select_college(privates, bounds[i], conf.college_rank_select_number[i]))
                     .flatten()
                     .collect::<HashSet<Cid>>() //一旦Setにして重複を削除
                     .into_iter()
@@ -149,7 +150,7 @@ impl Student {
     }
 
     // 私立大学ランク別グループから、configでグループ別に指定された数だけ出願校を選択する。
-    fn select_college(&mut self, conf: &Config, colleges: &[College], bound: (usize, usize), select_number: usize) -> Vec<usize>{
+    fn select_college(&mut self, colleges: &[College], bound: (usize, usize), select_number: usize) -> Vec<usize>{
         let mut v: Vec<usize> = Vec::new();
         let size = (bound.1 as i32) - (bound.0 as i32) + 1;
         //上限と下限が同値、1校しかなかった場合、
@@ -236,4 +237,33 @@ impl Student {
     pub fn exam_dev(&self, cid: Cid) -> &i32{
         self.c_map.get(&cid).unwrap()
     }
+}
+
+// シミュレーション結果CSV
+#[derive(Debug, Default, Clone, Serialize)]
+pub struct StudentResult{ 
+    pub epoch: i32, //エポック数
+    pub id: Sid,
+    pub score: i32, //偏差値を1000倍した整数
+    pub result: String, // cid:value_cid:valueの形式
+}
+
+// 受験結果マトリクスを１学生１行の形式にしたデバック用受験生入試結果ベクターを作成
+pub fn settle(epoch: i32, students: &[Student], smap: &mut HashMap<Sid,Vec<(Cid, u8)>>)  -> Vec<StudentResult>{
+   students.iter()
+        .map(|s| StudentResult{
+            epoch: epoch,
+            id: s.id,
+            score: s.score,
+            result: if let Some(c_vec) = smap.get(&s.id){
+                        c_vec.iter()
+                            .map(|(cid, status)| format!("{}:{}", cid, *status) )
+                            .collect::<Vec<_>>()
+                            .join(" ")
+                    } else {//受験せず
+                        "".to_string()
+                    }
+            }
+        )
+        .collect()
 }

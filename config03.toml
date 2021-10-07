@@ -41,3 +41,6 @@ enroll_add_rate = 0
 #  0なら偏差値足切りなし
 #  2021.10.04
 enroll_add_lower = 3000
+
+#実行年数
+epochs = 10

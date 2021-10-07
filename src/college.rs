@@ -10,7 +10,7 @@ use crate::Matrix;
 
 pub type Cid = usize; //大学ID
 
-#[derive(Debug,Clone,Deserialize)]
+#[derive(Debug,Clone,Default,Deserialize)]
 pub struct College{
     pub cid: Cid, //旺文社の大学番号
     pub name: String,  //  大学名
@@ -51,6 +51,20 @@ impl College {
         colleges.par_sort_unstable_by(|a, b| a.score.cmp(&b.score));
         for i in 0..colleges.len() {colleges[i].index = i}
         Ok(colleges)    
+    }
+
+    //1ステップ分の入試結果を反映した新しいエージェントを返す
+    pub fn update(&self, result: &CollegeResult) -> College{
+        let mut college = self.clone();
+        college.dev = result.new_deviation;
+        college.score = (college.dev * 1000.0).round() as i32;
+        //次年度の合格者超過率
+        //入試結果を元に次年度のあるべき（辞退者が出ても入学定員になる）定員超過率を計算
+        //入学率（入学者数/合格者数）の逆数
+        let decline_rate = result.admissons as f64 /
+                     (result.enroll_1st_count + result.enroll_add_count) as f64;
+        college.over_rate = 1.0 / decline_rate; 
+        college
     }
 
     //私立一次合格者決定 
@@ -158,6 +172,8 @@ impl College {
 // シミュレーション結果CSV
 #[derive(Debug, Default, Clone, Serialize)]
 pub struct CollegeResult{
+    //エポック数
+    pub epoch: i32,
     //基本情報　初期値から不変
     pub index: usize, //偏差値昇順ソート後の連番。配列のインデックス
     pub cid: Cid, //旺文社の大学番号

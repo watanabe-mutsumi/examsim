@@ -27,8 +27,9 @@ pub struct Config{
     
     pub apply_pattern_rate: [i32; 3],
     pub enroll_add_rate: f64,
-    pub enroll_add_lower: i32
+    pub enroll_add_lower: i32,
 
+    pub epochs: i32,
 }
 
 impl Config {
@@ -56,8 +57,8 @@ impl Config {
     pub const R_ADMISSION_3RD: u8 = 97; //追加入学決定
 
     //大学設定区分
-    pub const NATIONAL: u8 = 1; //国立
-    pub const PUBLIC: u8 = 2; //公立
+    // pub const NATIONAL: u8 = 1; //国立
+    // pub const PUBLIC: u8 = 2; //公立
     pub const PRIVATE: u8 = 3; //私立
 
     //入学定員超過率の年度別上限
@@ -81,7 +82,7 @@ impl Config {
 
         if let Some(filename) = matches.value_of("CONFIG_FILE") {
             let mut f = fs::File::open(filename).expect("config toml file not found");
-            eprintln!("設定ファイル = {:?}", filename);
+            eprintln!("    設定ファイル = {:?}", filename);
             let mut contents = String::new();
             f.read_to_string(&mut contents).expect("config file read error");
             let mut cfg: Config = toml::from_str(&contents).unwrap();
