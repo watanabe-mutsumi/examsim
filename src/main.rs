@@ -6,7 +6,6 @@ use rayon::prelude::*;
 use sprs::{TriMat, CsMatBase};
 use std::time::Instant;
 use std::collections::HashMap;
-use std::io::stdout;
 use chrono::Local;
 use anyhow::Result;
 
@@ -359,15 +358,16 @@ fn settle(epoch: i32, students: &Vec<Student>, colleges: &Vec<College>, status: 
 
 //シミュレーション結果を出力
 fn output_result(epoch: i32, college_results: &Vec<CollegeResult>, student_results: &Vec<StudentResult>) -> Result<()>{
-    //大学側結果を標準出力にCSVで出力
-    let mut wtr = csv::Writer::from_writer(stdout());
+    //大学側結果をCSVで出力
+    let path = format!("{}/c_result{:02}.csv", Config::get().output_dir, epoch);
+    let mut wtr = csv::Writer::from_path(path).unwrap();
     for c in college_results{
         wtr.serialize(c)?;
     }
     wtr.flush()?;
 
     //学生側結果を指定フォルダーに保存
-    let path = format!("{}/result{:02}.csv", Config::get().output_dir, epoch);
+    let path = format!("{}/s_result{:02}.csv", Config::get().output_dir, epoch);
     let mut wtr = csv::Writer::from_path(path).unwrap();
     for s in student_results{
         wtr.serialize(s)?;
