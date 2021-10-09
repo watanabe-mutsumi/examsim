@@ -41,20 +41,21 @@ impl Config {
     pub const RESERVE: u8 = 4;  //入学金納付し入学保留（学生）
     pub const ADMISSION_1ST: u8 = 8;  //私立入学先先行決定（学生）
     pub const ENROLL_2ND: u8 = 16; //国公立合格（大学）
-    pub const ENROLL_3RD: u8 = 32; //追加合格（大学）
-    pub const ADMISSION_2ND: u8 = 64; //入学先最終決定（学生）
+    pub const ADMISSION_2ND: u8 = 32; //保留先へ入学決定（学生）
+    pub const ENROLL_3RD: u8 = 64; //追加合格（大学）
+    pub const ADMISSION_3RD: u8 = 128; //追加合格大学へ入学（学生）
 
     //大学入試結果resultマトリクス集計時の意味
     pub const R_FAILED: u8 = 1;  //不合格
     pub const R_DECLINE1: u8 = 3;  //辞退
     pub const R_DECLINE1_PAID: u8 = 7;  //入学金納付後辞退
-    pub const R_DECLINE2: u8 = 33;  //追加合格辞退
+    pub const R_DECLINE2: u8 = 65;  //追加合格辞退
     pub const R_RESERVED: u8 = 7;   //入学金納付後保留中
-    pub const R_ENROLL_3RD: u8 = 33;  //追加合格中
+    pub const R_ENROLL_3RD: u8 = 65;  //追加合格辞退
     pub const R_ADMISSION_1ST: u8 = 11; //一次合格で私立入学
     pub const R_ADMISSION_2ND: u8 = 17; //国公立に合格し入学
-    pub const R_ADMISSION_RSV: u8 = 71; //一次合格保留後私立入学
-    pub const R_ADMISSION_3RD: u8 = 97; //追加入学決定
+    pub const R_ADMISSION_RSV: u8 = 39; //一次合格保留後私立入学
+    pub const R_ADMISSION_3RD: u8 = 193; //追加入学決定
 
     //大学設定区分
     // pub const NATIONAL: u8 = 1; //国立

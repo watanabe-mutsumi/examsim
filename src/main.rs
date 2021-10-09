@@ -38,17 +38,13 @@ fn run(conf: &Config, timer: &Instant) -> Result<()>{
     //大学エージェント初期値
     let mut colleges: Vec<College> = College::from_conf(conf)?;
 
-    //シミュレーション実行
     for epoch in 0..conf.epochs{
         eprintln!("    epoch[{:02}]:start \t{:?}",epoch, timer.elapsed());
-        //1回分のシミュレーション実行
         match step(epoch, &mut colleges, conf){
             Ok((new_colls,college_result, student_result)) =>{
                 colleges = new_colls;
-                //シミュレーション結果出力。大学側集計結果を標準出力にCSV形式で出力
-                //デバッグ用に学生単位の結果をoutput用フォルダーにCSV形式で保存
                 output_result(epoch, &college_result, &student_result)?;
-                },
+            },
             Err(e) => eprintln!("step error epoch=[{:02}] msg=[{:?}]",epoch, e),
         }
     }
@@ -78,22 +74,28 @@ fn step(epoch: i32, colleges: &mut Vec<College>, conf: &Config)
     //Step:4 国公立合格発表（大学行動）
     let enroll2_matrix = enroll2(colleges, &students, &apply_matrix);
 
-    //状態遷移マトリクス集計
-    let status = &apply_matrix + &(enroll1_matrix.transpose_into());
-    let status = &status + &adm1_matrix;
+    //状態遷移マトリクス集計 => S x C 
+    let status = &enroll1_matrix + &enroll2_matrix;
+    let status = &status + &(apply_matrix.transpose_into());
+    let status = &status + &(adm1_matrix.transpose_into());
 
-    //Step:5 私立追加合格発表（大学行動）
-    let enroll3_matrix = enroll3(colleges, &students, &status);
-
-    //状態遷移マトリクス集計
-    let status = &enroll2_matrix  + &(status.transpose_into());
-    let status = &status + &enroll3_matrix;
-
-    //Step:6 入学先最終決定（学生行動）
+    //Step:5 保留中私立合格大学への入学（学生行動）
     let adm2_matrix  = admission2(&mut students, &colleges, &status);
 
-    //状態遷移マトリクス集計
+    //状態遷移マトリクス集計 => C x S
     let status = &adm2_matrix + &(status.transpose_into());
+    
+    //Step:6 私立追加合格発表（大学行動）
+    let enroll3_matrix = enroll3(colleges, &students, &status);
+
+    //状態遷移マトリクス集計 => S x C
+    let status = &enroll3_matrix  + &(status.transpose_into());
+
+    //Step:7 入学先最終決定。追加合格大学への入学（学生行動）
+    let adm3_matrix  = admission3(&mut students, &colleges, &status);
+
+    //状態遷移マトリクス集計 => C x S
+    let status = &adm3_matrix + &(status.transpose_into());
     
     //シミュレーション結果を集計し、次step用大学オブジェクトと集計結果を生成
     settle(epoch, &students, &colleges, status)
@@ -109,11 +111,7 @@ fn apply(students: &mut Vec<Student>, nationals: &[College], privates: &[College
                 for college_idx in entries { acc.push((college_idx, idx));};
                 acc
         })
-        .reduce( || Vec::new(),
-          |mut left, mut right| {
-              left.append(&mut right);
-              left
-        });
+        .reduce(|| Vec::new(), append_vector);
 
     // 出願sparseマトリクス　行=大学、列=受験生、値1(出願) を作成
     make_matrix(&apply_list, nationals.len() + privates.len(), students.len(), Config::APPLY)
@@ -130,11 +128,7 @@ fn enroll1(colleges:&mut Vec<College>, students: &[Student], apply_mat: &Matrix)
                 for student_idx in entries {acc.push((student_idx, idx));}
                 acc
         })
-        .reduce( || Vec::new(),
-        |mut left, mut right| {
-            left.append(&mut right);
-            left
-        });
+        .reduce( || Vec::new(), append_vector);
 
     // 合格sparseマトリクス　行=受験生、列=大学、値2(合格) を作成
     make_matrix(&enroll_list, students.len(), colleges.len(), Config::ENROLL_1ST)
@@ -155,11 +149,7 @@ fn enroll1(colleges:&mut Vec<College>, students: &[Student], apply_mat: &Matrix)
                 acc.append(&mut entries);
                 acc
         })
-        .reduce( || Vec::new(),
-          |mut left, mut right| {
-              left.append(&mut right);
-              left
-        });
+        .reduce( || Vec::new(), append_vector);
 
     // 入学金納付者sparseマトリクス　行=大学、列=受験生、値４(入学金納付のみ) or 8（入学）を作成
     make_matrix_any_value(&new_list, colleges.len(), students.len())
@@ -176,11 +166,8 @@ fn enroll2(colleges:&mut Vec<College>, students: &[Student], mat: &Matrix) -> Ma
                 for student_idx in entries {acc.push((student_idx, idx));}
                 acc
         })
-        .reduce( || Vec::new(),
-        |mut left, mut right| {
-            left.append(&mut right);
-            left
-        });
+        .reduce( || Vec::new(), append_vector);
+
 
     // 合格sparseマトリクス　行=受験生、列=大学、値2(合格) を作成
     make_matrix(&new_list, students.len(), colleges.len(), Config::ENROLL_2ND)
@@ -197,18 +184,14 @@ fn enroll3(colleges:&mut Vec<College>, students: &[Student], mat: &Matrix) -> Ma
                 for student_idx in entries {acc.push((student_idx, idx));}
                 acc
         })
-        .reduce( || Vec::new(),
-        |mut left, mut right| {
-            left.append(&mut right);
-            left
-        });
+        .reduce(|| Vec::new(), append_vector);
 
     // 合格sparseマトリクス　行=受験生、列=大学、値32(追加合格) を作成
     make_matrix(&new_list, students.len(), colleges.len(), Config::ENROLL_3RD)
 }
 
 
-// 入学大学最終決定
+// 保留中大学への入学
 fn admission2
     (students: &mut Vec<Student>, colleges: &[College], mat: &Matrix) -> Matrix { 
     let admission_list: Vec<(Cid, Sid)> = students.par_iter_mut()
@@ -220,14 +203,33 @@ fn admission2
                 }
                 acc
         })
-        .reduce( || Vec::new(),
-          |mut left, mut right| {
-              left.append(&mut right);
-              left
-        });
+        .reduce( || Vec::new(), append_vector);
+
+    // 入学者sparseマトリクス　行=大学、列=受験生、値32(保留中私立入学) を作成
+    make_matrix(&admission_list, colleges.len(), students.len(), Config::ADMISSION_2ND)
+}
+
+// 追加合格大学への入学
+fn admission3
+    (students: &mut Vec<Student>, colleges: &[College], mat: &Matrix) -> Matrix { 
+    let admission_list: Vec<(Cid, Sid)> = students.par_iter_mut()
+        .fold_with( Vec::new(),
+            |mut acc, x|{
+                let idx = x.id;
+                if let Some(college_idx) = x.admission3(&Config::get(), colleges, mat, idx){
+                    acc.push((college_idx, idx));
+                }
+                acc
+        })
+        .reduce( || Vec::new(), append_vector);
 
     // 入学者sparseマトリクス　行=大学、列=受験生、値64(最終決定入学先) を作成
-    make_matrix(&admission_list, colleges.len(), students.len(), Config::ADMISSION_2ND)
+    make_matrix(&admission_list, colleges.len(), students.len(), Config::ADMISSION_3RD)
+}
+
+fn append_vector<T>(mut left: Vec<T>, mut right: Vec<T>) -> Vec<T>{
+    left.append(&mut right);
+    left
 }
 
 // sparseマトリクス作成　行=受験生or大学、列=大学or受験生、値 を作成
@@ -289,15 +291,15 @@ fn settle(epoch: i32, students: &Vec<Student>, colleges: &Vec<College>, status: 
         //件数集計
         //一次合格者数
         let enroll_1st_count = count(&values, Config::ENROLL_1ST) + 
-                            count(&values, Config::ENROLL_2ND);
-            //追加合格者数
+                               count(&values, Config::ENROLL_2ND);
+        //追加合格者数
         let enroll_add_count = count(&values, Config::ENROLL_3RD);
 
         //一次合格入学者数
         let admission_1st_count = count_eq(&counters, &Config::R_ADMISSION_1ST) +
-                                count_eq(&counters, &Config::R_ADMISSION_2ND);
+                                  count_eq(&counters, &Config::R_ADMISSION_2ND);
 
-            //一次合格保留後入学者数
+         //一次合格保留後入学者数
         let admission_rsv_count = count_eq(&counters, &Config::R_ADMISSION_RSV);
 
         //追加合格入学者数
@@ -350,16 +352,16 @@ fn settle(epoch: i32, students: &Vec<Student>, colleges: &Vec<College>, status: 
 
     //受験生入試結果生成
     let student_results = student::settle(epoch, students, &mut student_map);
-
+    
+    
     Ok((new_colleges, college_results, student_results))
 }
 
 
-
 //シミュレーション結果を出力
-fn output_result(epoch: i32, college_results: &Vec<CollegeResult>, student_results: &Vec<StudentResult>) -> Result<()>{
+fn output_result(epoch: i32, college_results: &[CollegeResult], student_results: &[StudentResult]) -> Result<()>{
     //大学側結果をCSVで出力
-    let path = format!("{}/c_result{:02}.csv", Config::get().output_dir, epoch);
+    let path = format!("{}/college{:02}.csv", Config::get().output_dir, epoch);
     let mut wtr = csv::Writer::from_path(path).unwrap();
     for c in college_results{
         wtr.serialize(c)?;
@@ -367,7 +369,7 @@ fn output_result(epoch: i32, college_results: &Vec<CollegeResult>, student_resul
     wtr.flush()?;
 
     //学生側結果を指定フォルダーに保存
-    let path = format!("{}/s_result{:02}.csv", Config::get().output_dir, epoch);
+    let path = format!("{}/student{:02}.csv", Config::get().output_dir, epoch);
     let mut wtr = csv::Writer::from_path(path).unwrap();
     for s in student_results{
         wtr.serialize(s)?;
@@ -399,7 +401,7 @@ fn count_eq(m: &HashMap<u8, i32>, key: &u8) -> i32{
 
 //bitマップ＆で一致する個数を取得する
 fn count(values: &[Option<(Sid, u8)>], key: u8) -> i32{
-    let v: Vec<u8> = values.iter().map(|x| x.unwrap().1)
-        .filter(|x| x & key != 0).collect();
-    v.len() as i32
+    values.iter().map(|x| x.unwrap().1)
+        .filter(|x| x & key != 0)
+        .count() as i32
 }

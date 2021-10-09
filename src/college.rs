@@ -115,10 +115,9 @@ impl College {
             .map(|col| (*col, *matrix.get(idx, *col).unwrap()))
             .collect();
         let current_admisson_num = statuss.iter()
-            .filter(|(_, val)| *val == Config::R_ADMISSION_1ST)
-            .map(|(_, val)| val)
-            .collect::<Vec::<&u8>>()
-            .len();
+            .filter(|(_, val)|  *val == Config::R_ADMISSION_1ST ||
+                                *val == Config::R_ADMISSION_RSV )
+            .count();
         
         let diff = if current_admisson_num > self.enroll as usize{
                 0 as usize
