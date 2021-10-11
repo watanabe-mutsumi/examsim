@@ -17,9 +17,9 @@ pub type Sid = usize; //学生ID
 
 #[derive(Debug,Clone)]
 pub enum ApplyPattern {
-    NationalPublicOnly, //国公立のみ
-    Both, // 国公立私立併願
-    PrivateOnly, //私立専願
+    NationalPublicOnly = 0, //国公立のみ
+    Both = 1, // 国公立私立併願
+    PrivateOnly = 2, //私立専願
 }
 
 
@@ -122,13 +122,14 @@ impl Student {
         match bounds{
             // 偏差値に合う国公立なし
             (0, 0) => None,
-            _ => {// 大学グループから一様分布で1校だけ大学を選択
+            _ => {// 大学グループから入学定員に比例した確率または一様分布で1校だけ大学を選択
                 let size = (bounds.1 as i32) - (bounds.0 as i32) + 1;
                 if size <= 1 {
                     Some(nationals[bounds.0].index)
                 } else {
-                    let idx = sample(&mut self.rng, size as usize, 1).index(0);
-                    Some(nationals[idx + bounds.0].index)
+                    let idx_v = self.random_select(Config::get().college_select_by_enroll,
+                         size as usize, 1, bounds.0, nationals);
+                    Some(nationals[idx_v[0]].index)
                 }
             }
         }
@@ -159,11 +160,9 @@ impl Student {
         // 大学数が出願数以下だった場合。
         }else if size <= select_number as i32{
             (bound.0..=bound.1).into_iter().for_each(|x| v.push(x));
-        // 大学グループから一様分布で出願数だけ大学を選択
+        // 大学グループから入学定員に比例した確率または一様分布で出願数だけ大学を選択
         }else {
-            v = sample(&mut self.rng, size as usize, select_number).into_vec()
-                .iter()
-                .map(|x| x + bound.0).collect();
+            v = self.random_select(Config::get().college_select_by_enroll, size as usize, select_number, bound.0, colleges);
         }
         //私立大学配列上のインデクスから、その先の大学全体のインデックスに変換してから値を返す
         v.iter().map(|x| colleges[*x].index).collect()
@@ -172,6 +171,53 @@ impl Student {
     // 入学試験。自分の偏差値 + 標準正規分布誤差を返す。
     fn exam(&mut self) -> i32{
         self.score + (self.rng.sample::<f32, _>(StandardNormal) * 1000.0).round() as i32
+    }
+
+    //一様分布又は入学定員に比例した確率で大学を選択
+    fn random_select(&mut self, proportional: bool, size: usize, select_number: usize, offset: usize, colleges: &[College]) -> Vec<usize>{
+        if proportional{
+            let mut v: Vec<usize> = Vec::new();
+            let choice = (0..size).into_iter().map(|x|x + offset).collect::<Vec<usize>>();
+            let weight = choice.iter().map(|x| colleges[*x].enroll).collect::<Vec<u32>>();
+            let dist = WeightedIndex::new(weight).unwrap();
+            while v.len() < select_number{
+                let bingo = choice[dist.sample(&mut self.rng)];
+                if v.is_empty() || !v.contains(&bingo){
+                    v.push(bingo);
+                }
+            }
+            v
+        } else {
+            sample(&mut self.rng, size as usize, select_number).into_vec()
+                .iter()
+                .map(|x| x + offset).collect()
+        }
+    } 
+
+    //入学決定１　志望校合格時に入学 or 入学金納付のみ or パス
+    pub fn admission1(&mut self, _conf: &Config, colleges: &[College], passed_ids: &[Cid]) -> Vec<(usize, (usize, u8))>{
+        let select_college: Cid;
+        match passed_ids.len(){
+            0 => Vec::<(usize, (usize, u8))>::new(), //合格大学なし
+            _ => { 
+                let mut apply_colleges: Vec::<&College> = self.c_map.iter()
+                    .map(|(key, _)| &colleges[*key])
+                    .collect();
+                apply_colleges.sort_unstable_by(|a, b| b.score.cmp(&a.score));
+                select_college = apply_colleges[0].index;
+    
+
+                //意中の大学には入学、それ以外には保留の値をもつベクトルを返す
+                passed_ids.iter()
+                    .map(|cid|{
+                        (*cid, (self.id, if *cid == select_college {
+                                 Config::ADMISSION_1ST
+                                }else{
+                                 Config::RESERVE
+                                }))})
+                    .collect()
+            }
+        }
     }
 
     // 合格保留中大学から入学する大学を選択。
@@ -240,33 +286,6 @@ impl Student {
         self.admission = Some(passed_colleges[0].index);
         self.admission
     }
-
-    //入学決定１　志望校合格時に入学 or 入学金納付のみ or パス
-    pub fn admission1(&mut self, _conf: &Config, colleges: &[College], passed_ids: &[Cid]) -> Vec<(usize, (usize, u8))>{
-        let select_college: Cid;
-        match passed_ids.len(){
-            0 => Vec::<(usize, (usize, u8))>::new(), //合格大学なし
-            _ => { 
-                let mut apply_colleges: Vec::<&College> = self.c_map.iter()
-                    .map(|(key, _)| &colleges[*key])
-                    .collect();
-                apply_colleges.sort_unstable_by(|a, b| b.score.cmp(&a.score));
-                select_college = apply_colleges[0].index;
-    
-
-                //意中の大学には入学、それ以外には保留の値をもつベクトルを返す
-                passed_ids.iter()
-                    .map(|cid|{
-                        (*cid, (self.id, if *cid == select_college {
-                                 Config::ADMISSION_1ST
-                                }else{
-                                 Config::RESERVE
-                                }))})
-                    .collect()
-            }
-        }
-    }
-
     //指定大学の受験時点数（偏差値）を取得
     pub fn exam_dev(&self, cid: Cid) -> &i32{
         self.c_map.get(&cid).unwrap()
@@ -274,24 +293,27 @@ impl Student {
 }
 
 // シミュレーション結果CSV
-#[derive(Debug, Default, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct StudentResult{ 
     pub epoch: i32, //エポック数
     pub id: Sid,
     pub score: i32, //偏差値を1000倍した整数
+    pub pattern: u8, //出願パターン
     pub result: String, // cid:value_cid:valueの形式
 }
 
 // 受験結果マトリクスを１学生１行の形式にしたデバック用受験生入試結果ベクターを作成
-pub fn settle(epoch: i32, students: &[Student], smap: &mut HashMap<Sid,Vec<(Cid, u8)>>)  -> Vec<StudentResult>{
+pub fn settle(epoch: i32, students: &[Student], smap: &mut HashMap<Sid,Vec<(Cid, u8)>>, colleges: &[College])  -> Vec<StudentResult>{
    students.par_iter()
         .map(|s| StudentResult{
             epoch: epoch,
             id: s.id,
             score: s.score,
+            pattern: s.pattern.clone() as u8,
             result: if let Some(c_vec) = smap.get(&s.id){
                         c_vec.iter()
-                            .map(|(cid, status)| format!("{}:{}", cid, *status) )
+                            .map(|(cid, status)| 
+                                format!("{}:{}:{}", colleges[*cid].institute, cid, *status) )
                             .collect::<Vec<_>>()
                             .join(" ")
                     } else {//受験せず

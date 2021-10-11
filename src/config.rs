@@ -30,6 +30,8 @@ pub struct Config{
     pub enroll_add_lower: i32,
 
     pub epochs: i32,
+
+    pub college_select_by_enroll: bool,
 }
 
 impl Config {

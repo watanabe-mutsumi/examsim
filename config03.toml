@@ -44,3 +44,7 @@ enroll_add_lower = 3000
 
 #実行年数
 epochs = 10
+
+#出願時同一グループ内大学選択確率を
+#一様ではなく大学の入学定員に比例させるか
+college_select_by_enroll = false

@@ -351,7 +351,7 @@ fn settle(epoch: i32, students: &Vec<Student>, colleges: &Vec<College>, status: 
     for i in 0..new_colleges.len() {new_colleges[i].index = i}
 
     //受験生入試結果生成
-    let student_results = student::settle(epoch, students, &mut student_map);
+    let student_results = student::settle(epoch, students, &mut student_map, &colleges);
     
     
     Ok((new_colleges, college_results, student_results))
