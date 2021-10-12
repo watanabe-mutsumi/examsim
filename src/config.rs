@@ -10,26 +10,28 @@ use chrono::Local;
 // グローバルな設定情報オブジェクト
 pub static CONFIG: OnceCell<Config> = OnceCell::new();
 
-
-
 #[derive(Debug,Clone,Deserialize)]
 pub struct Config{
     pub initial_college_csv: String,
-    pub student_number: usize,
+    pub student_number: Vec<usize>,
+    pub student_dev_mu: f64,
+    pub student_dev_sigma: f64,
     pub random_seed: u64,
     pub output_dir_base: String,
     pub output_dir: String,
 
+    pub national_prob: f64,
     pub national_range: [i32; 2],
     pub college_rank_lower: [i32; 3],
     pub college_rank_upper: [i32; 3],
-    pub college_rank_select_number: [usize; 3],
+    pub college_rank_select_number: [[usize; 3]; 2],
     
-    pub apply_pattern_rate: [i32; 3],
+    pub first_pattern_rate: f64,
     pub enroll_add_rate: f64,
     pub enroll_add_lower: i32,
 
     pub epochs: i32,
+    pub start_year: usize,
 
     pub college_select_by_enroll: bool,
 }
@@ -90,6 +92,8 @@ impl Config {
             f.read_to_string(&mut contents).expect("config file read error");
             let mut cfg: Config = toml::from_str(&contents).unwrap();
             cfg.output_dir = Config::get_output_dirname(& cfg)?;
+            //設定ファイルを出力先Dirにコピー
+            fs::copy(filename, format!("{}/{}",cfg.output_dir, filename)).unwrap();
             CONFIG.set(cfg).unwrap();
             Ok(())
         } else {
@@ -97,18 +101,6 @@ impl Config {
             exit(1)
         }
     }
-
-    // Configオブジェクト生成。　関数引数に直接指定された設定ファイル名から。
-    // pub fn from_path(path: &str) -> Result<()>{
-    //     let mut f = fs::File::open(path).expect("config toml file not found");
-    //     eprintln!("設定ファイルは{:?}です。", path);
-    //     let mut contents = String::new();
-    //     f.read_to_string(&mut contents).expect("config file read error");
-    //     let mut cfg: Config = toml::from_str(&contents).unwrap();
-    //     cfg.output_dir = Config::get_output_dirname(& cfg)?;
-    //     CONFIG.set(cfg).unwrap();
-    //     Ok(())
-    // }
 
     // 生成済みのConfigオブジェクトを返す
     pub fn get() -> &'static Config{

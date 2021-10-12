@@ -10,8 +10,11 @@ use crate::Matrix;
 
 pub type Cid = usize; //大学ID
 
-#[derive(Debug,Clone,Default,Deserialize)]
+#[derive(Debug,Clone,Default,Deserialize,Serialize)]
 pub struct College{
+    #[serde(default)]
+    pub epoch: usize, //イテレーション番号。0オリジン。
+
     pub cid: Cid, //旺文社の大学番号
     pub name: String,  //  大学名
     pub institute: u8, // 設置区分：1国立 2公立 3私立
@@ -26,11 +29,17 @@ pub struct College{
     #[serde(default)]
     pub index: usize, //ソート後の連番。これが配列のインデックスになる。
     #[serde(default)]
+    #[serde(skip_serializing)]
     pub s_vec: Vec<Sid>, //一次合格した受験生のインデックス
     #[serde(default)]
     pub new_enroll_num: usize, //今回の一次合格者総数最大値。私立用。
     #[serde(default)]
     pub add_enroll_num: usize, //今回の追加合格用人数。私立用。
+
+    #[serde(default)]
+    pub dev_history: Vec<f64>, //各ステップの偏差値履歴。
+    #[serde(default)]
+    pub fillrate_history: Vec<f64>, //各ステップの定員従属率履歴。
 
 
 
@@ -45,6 +54,9 @@ impl College {
         for result in rdr.deserialize(){
             let mut college: Self = result?;
             college.score = (college.dev * 1000.0).round() as i32;
+            college.dev_history.push(college.dev);//シミュレーション前の偏差値
+            college.fillrate_history.push(0.0);//シミュレーション前の充足率は0にしておく
+
             colleges.push(college);
         }
         // 偏差値の昇順にソート
@@ -56,14 +68,19 @@ impl College {
     //1ステップ分の入試結果を反映した新しいエージェントを返す
     pub fn update(&self, result: &CollegeResult) -> College{
         let mut college = self.clone();
+        college.epoch += 1; //1年分進める
         college.dev = result.new_deviation;
         college.score = (college.dev * 1000.0).round() as i32;
+
+        college.dev_history.push(result.new_deviation);
+        //定員充足率　入学者÷定員
+        college.fillrate_history.push( result.admissons as f64 / college.enroll as f64 );
+
         //次年度の合格者超過率
         //入試結果を元に次年度のあるべき（辞退者が出ても入学定員になる）定員超過率を計算
-        //入学率（入学者数/合格者数）の逆数
-        let decline_rate = result.admissons as f64 /
-                     (result.enroll_1st_count + result.enroll_add_count) as f64;
-        college.over_rate = 1.0 / decline_rate; 
+        //合格者数/入学者数
+        college.over_rate = (result.enroll_1st_count + result.enroll_add_count) as f64 /
+            result.admissons as f64; 
         college
     }
 
@@ -154,9 +171,20 @@ impl College {
     // 今年度の合格者数を計算
     fn enroll_num(&self) -> usize{
         let own_scale = self.college_scale();
-        // 暫定: 2016(0)以前と2016(1)の増減率を取得。本当は毎年変わる。
+        // 2016(0)以前と2016(1)の増減率を取得。
+        let this_year = Config::get().start_year + self.epoch;
+        let (before, current): (usize, usize) =  if self.institute == Config::PRIVATE {
+            match this_year{
+                0..=2015    => (0,0),//変化なし
+                2016..=2018 => (this_year - 2016, this_year - 2015),
+                _ => (3,3), //変化なし
+            }} else {//国公立は変化させない
+                (0,0)
+            };
+
         let limit_change_rate = 
-            Config::MAX_ENROLLMENT_RATES[1][own_scale]/Config::MAX_ENROLLMENT_RATES[0][own_scale];
+            Config::MAX_ENROLLMENT_RATES[current][own_scale] / 
+            Config::MAX_ENROLLMENT_RATES[before][own_scale];
         ((self.enroll as f64) * self.over_rate * limit_change_rate).ceil() as usize
     }
 

@@ -17,7 +17,6 @@ pub type Sid = usize; //学生ID
 
 #[derive(Debug,Clone)]
 pub enum ApplyPattern {
-    NationalPublicOnly = 0, //国公立のみ
     Both = 1, // 国公立私立併願
     PrivateOnly = 2, //私立専願
 }
@@ -45,14 +44,12 @@ impl Student {
         }
     }
 
-    pub fn from_conf(conf: &Config) -> Vec<Self> {
+    pub fn from_conf(conf: &Config, epoch: usize) -> Vec<Self> {
         let mut rng1 = Xoshiro256StarStar::seed_from_u64(conf.random_seed);
-        let normal = Normal::new(50.0, 10.0).unwrap();
-        let choice = [ApplyPattern::NationalPublicOnly, ApplyPattern::Both, ApplyPattern::PrivateOnly];
-        let pattern = WeightedIndex::new(&conf.apply_pattern_rate).unwrap();
+        let normal = Normal::new(conf.student_dev_mu, conf.student_dev_sigma).unwrap();
 
         let mut students: Vec<Self> = normal.sample_iter(&mut rng1)
-            .take(conf.student_number)
+            .take(conf.student_number[epoch]) //今回の年度の志願者数分生成
             .collect::<Vec<f64>>()
             .into_iter()
             .map(|x| Student::new(x, &mut rng1))
@@ -64,7 +61,11 @@ impl Student {
                 //連番をIDとして設定。偏差値が低いほど若い。
                 x.id = i;
                 //併願パターンを決定
-                x.pattern = choice[pattern.sample(&mut x.rng)].clone();
+                x.pattern = if x.rng.gen_bool(conf.national_prob){
+                    ApplyPattern::Both.clone() //国立も受験
+                } else {
+                    ApplyPattern::PrivateOnly
+                };
                 x
             })
             .collect()
@@ -75,34 +76,46 @@ impl Student {
     // 試験結果として誤差を加えた自分の偏差値を大学インデックスをキーとしたMapに保存する。
     pub fn apply(&mut self, conf: &Config, nationals: &[College], privates: &[College]) -> (Vec<(usize, usize)>, Vec<Cid>){
         
-        let mut c_vec: Vec<Cid> = Vec::new(); //選択した大学
-        let mut bounds: Vec<(usize, usize)> = Vec::new();//私立大学ランク範囲
+        let mut c_vec:Vec<Cid> ; //選択した大学
+        let bounds: Vec<(usize, usize)> ;//私立大学ランク範囲
         let mut national: Option<Cid> = None;
 
+        //出願数のパターンをランダムに選択
+        let pattern: usize = if self.rng.gen_bool(conf.first_pattern_rate){
+            0 //延べ6校
+        } else{
+            1 //延べ7校
+        };
+
         match self.pattern {
-            ApplyPattern::Both | ApplyPattern::NationalPublicOnly => {
+            ApplyPattern::Both => {
                 // 1:国公立を１校選択
                 national = self.from_nationals(conf, nationals);
             },
             _ => (),
         }
-        match self.pattern {
-            ApplyPattern::Both | ApplyPattern::PrivateOnly => {
-                // 2:私立大学から複数選択
-                let rank_num = conf.college_rank_lower.len();
-                bounds = (0..rank_num).into_iter()
-                    .map(|i| self.get_bounds(conf.college_rank_lower[i], conf.college_rank_upper[i], privates))
-                    .collect();
-                // println!("inner:bounds:{:?}",bounds);
-                c_vec = (0..rank_num).into_iter()
-                    .map(|i| self.select_college(privates, bounds[i], conf.college_rank_select_number[i]))
-                    .flatten()
-                    .collect::<HashSet<Cid>>() //一旦Setにして重複を削除
-                    .into_iter()
-                    .collect();
-            },
-            _ => (),
-        }
+        // 2:私立大学から複数選択
+        let rank_num = conf.college_rank_lower.len();
+        bounds = (0..rank_num).into_iter()
+            .map(|i| self.get_bounds(conf.college_rank_lower[i], conf.college_rank_upper[i], privates))
+            .collect();
+        // println!("inner:bounds:{:?}",bounds);
+        // ABC大学ランク毎に指定選択数だけ大学を選ぶ
+        c_vec = (0..rank_num).into_iter()
+            .map(|i| {
+                //Aランク(i==0)時、国公立にも出願する場合には選択数をその分１つ減らす
+                let mut select_number = conf.college_rank_select_number[pattern][i];
+                match national{
+                    None =>  (), //そのまま
+                    _ => if i == 0 { select_number -= 1 } //１校分減らす
+                }
+                self.select_college(privates, bounds[i], select_number)
+            })
+            .flatten()
+            .collect::<HashSet<Cid>>() //一旦Setにして重複を削除
+            .into_iter()
+            .collect();
+        
         // 3:国公立があれば配列に追加
         if let Some(n) = national{
             c_vec.push(n);

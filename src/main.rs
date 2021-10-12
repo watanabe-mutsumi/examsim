@@ -8,9 +8,10 @@ use std::time::Instant;
 use std::collections::HashMap;
 use chrono::Local;
 use anyhow::Result;
+use serde_json;
 
 use crate::college::{College, Cid, CollegeResult};
-use crate::student::{ApplyPattern, Sid, Student, StudentResult};
+use crate::student::{Sid, Student, StudentResult};
 use crate::config::Config;
 
 pub type Matrix = CsMatBase<u8, usize, Vec<usize>, Vec<usize>, Vec<u8>, usize>;
@@ -49,6 +50,8 @@ fn run(conf: &Config, timer: &Instant) -> Result<()>{
         }
     }
 
+    output_history(&colleges)?;
+
     Ok(())
 }
 
@@ -57,7 +60,7 @@ fn step(epoch: i32, colleges: &mut Vec<College>, conf: &Config)
     ->Result<(Vec<College>, Vec<CollegeResult>, Vec<StudentResult>)>{
     
     //Step:0 受験生エージェントを作成
-    let mut students: Vec<Student> = Student::from_conf(conf);
+    let mut students: Vec<Student> = Student::from_conf(conf, epoch as usize);
 
     //国公立と私立大学に分けたベクターを用意
     let (nationals, privates) = divide_colleges(&colleges);
@@ -138,10 +141,6 @@ fn enroll1(colleges:&mut Vec<College>, students: &[Student], apply_mat: &Matrix)
  fn admission1
     (students: &mut Vec<Student>, colleges: &[College], enroll_mat: &Matrix) -> Matrix { 
     let new_list: Vec<(Cid, SidStatus)> = students.par_iter_mut()
-        .filter(|x| match x.pattern{
-            ApplyPattern::Both | ApplyPattern::PrivateOnly => true,
-            _ => false,
-        })
         .fold_with( Vec::new(),
             |mut acc, x|{
                 let idx = x.id;
@@ -375,6 +374,21 @@ fn output_result(epoch: i32, college_results: &[CollegeResult], student_results:
         wtr.serialize(s)?;
     }
     wtr.flush()?;
+
+    Ok(())
+}
+
+//シミュレーション結果を出力 　最終の大学エージェント（偏差値と入学定員充足率の履歴付き）をカレントに保存
+fn output_history(colleges: &[College]) -> Result<()>{
+    //最終の大学エージェント（偏差値と入学定員充足率の履歴付き）をカレントに保存
+    //let path = "history.csv";
+    let content = serde_json::to_string_pretty(&colleges).unwrap();
+    println!("{}", content);
+    // let mut wtr = csv::Writer::from_path(path).unwrap();
+    // for c in colleges{
+    //     wtr.serialize(c)?;
+    // }
+    // wtr.flush()?;
 
     Ok(())
 }
