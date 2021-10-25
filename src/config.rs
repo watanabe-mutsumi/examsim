@@ -63,7 +63,7 @@ impl Config {
 
     //大学設定区分
     // pub const NATIONAL: u8 = 1; //国立
-    // pub const PUBLIC: u8 = 2; //公立
+    pub const PUBLIC: u8 = 2; //公立
     pub const PRIVATE: u8 = 3; //私立
 
     //入学定員超過率の年度別上限

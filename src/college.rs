@@ -29,6 +29,8 @@ pub struct College{
     #[serde(default)]
     pub index: usize, //ソート後の連番。これが配列のインデックスになる。
     #[serde(default)]
+    pub saved: bool, //定員割れで公立として救済されたかのフラグ
+    #[serde(default)]
     #[serde(skip_serializing)]
     pub s_vec: Vec<Sid>, //一次合格した受験生のインデックス
     #[serde(default)]
@@ -81,6 +83,31 @@ impl College {
         //合格者数/入学者数
         college.over_rate = (result.enroll_1st_count + result.enroll_add_count) as f64 /
             result.admissons as f64; 
+
+        // 3年連続で定員割れした私立を公立にする
+        let limit = 3;
+        if college.institute == Config::PRIVATE {
+            let mut history = college.fillrate_history.clone();
+            let mut count = 0;
+            for _i in 0..history.len(){
+                match history.pop() {
+                    Some(rate) if rate <  1.0  => count += 1,
+                    Some(_) => {
+                        count = 0;
+                        break;
+                    },
+                    None => break,
+                }
+                if count >= limit{
+                    break;
+                }
+            }
+            if count >= limit{
+                college.institute = Config::PUBLIC;
+                college.saved = true;
+            }
+        }
+
         college
     }
 
