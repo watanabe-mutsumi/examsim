@@ -34,6 +34,8 @@ pub struct Config{
     pub start_year: usize,
 
     pub college_select_by_enroll: bool,
+
+    pub small_college_rate: f64,
 }
 
 impl Config {
@@ -63,16 +65,20 @@ impl Config {
 
     //大学設定区分
     // pub const NATIONAL: u8 = 1; //国立
-    pub const PUBLIC: u8 = 2; //公立
+    // pub const PUBLIC: u8 = 2; //公立
     pub const PRIVATE: u8 = 3; //私立
 
     //入学定員超過率の年度別上限
-    pub const MAX_ENROLLMENT_RATES: [[f64; 3]; 4] = [
+    pub const MAX_ENROLLMENT_RATES: [[f64; 3]; 8] = [
         // 大学規模L M S
         [1.20, 1.30, 1.30], // < 2016
         [1.17, 1.27, 1.30], //  2016
         [1.14, 1.24, 1.30], //  2017
-        [1.10, 1.20, 1.30], //  2018 ~
+        [1.10, 1.20, 1.30], //  2018
+        [1.10, 1.20, 1.30], //  2019
+        [1.10, 1.20, 1.30], //  2020
+        [1.10, 1.20, 1.30], //  2021
+        [1.10, 1.20, 1.40], //  2022から小規模を1.4に緩和　2021.11.19
     ];
 
     ///////////////////////////////////////////////////////

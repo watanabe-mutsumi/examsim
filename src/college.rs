@@ -85,28 +85,28 @@ impl College {
             result.admissons as f64; 
 
         // 3年連続で定員割れした私立を公立にする
-        let limit = 3;
-        if college.institute == Config::PRIVATE {
-            let mut history = college.fillrate_history.clone();
-            let mut count = 0;
-            for _i in 0..history.len(){
-                match history.pop() {
-                    Some(rate) if rate <  1.0  => count += 1,
-                    Some(_) => {
-                        count = 0;
-                        break;
-                    },
-                    None => break,
-                }
-                if count >= limit{
-                    break;
-                }
-            }
-            if count >= limit{
-                college.institute = Config::PUBLIC;
-                college.saved = true;
-            }
-        }
+        // let limit = 3;
+        // if college.institute == Config::PRIVATE {
+        //     let mut history = college.fillrate_history.clone();
+        //     let mut count = 0;
+        //     for _i in 0..history.len(){
+        //         match history.pop() {
+        //             Some(rate) if rate <  1.0  => count += 1,
+        //             Some(_) => {
+        //                 count = 0;
+        //                 break;
+        //             },
+        //             None => break,
+        //         }
+        //         if count >= limit{
+        //             break;
+        //         }
+        //     }
+        //     if count >= limit{
+        //         college.institute = Config::PUBLIC;
+        //         college.saved = true;
+        //     }
+        // }
 
         college
     }
@@ -197,22 +197,34 @@ impl College {
 
     // 今年度の合格者数を計算
     fn enroll_num(&self) -> usize{
-        let own_scale = self.college_scale();
-        // 2016(0)以前と2016(1)の増減率を取得。
-        let this_year = Config::get().start_year + self.epoch;
-        let (before, current): (usize, usize) =  if self.institute == Config::PRIVATE {
-            match this_year{
-                0..=2015    => (0,0),//変化なし
-                2016..=2018 => (this_year - 2016, this_year - 2015),
-                _ => (3,3), //変化なし
-            }} else {//国公立は変化させない
-                (0,0)
+        //2021.11.21 私立のみ変化。国公立は1.0固定
+        if self.institute == Config::PRIVATE {
+            // 2016(0)以前と2016(1)の増減率を取得。
+            let before_current: (usize, usize);
+            let own_scale = self.college_scale();
+            let this_year = Config::get().start_year + self.epoch;
+            if Config::get().small_college_rate == 0.0 { // 2021.11.19 小規模優遇なし
+                before_current = match this_year{
+                    0..=2015    => (0,0),//変化なし
+                    2016..=2018 => (this_year - 2016, this_year - 2015),
+                    _ => (3,3), //変化なし
+                };
+            } else {
+                before_current = match this_year{
+                    0..=2015    => (0,0),//変化なし
+                    2016..=2022 => (this_year - 2016, this_year - 2015),
+                    _ => (4,4), //変化なし
             };
 
-        let limit_change_rate = 
-            Config::MAX_ENROLLMENT_RATES[current][own_scale] / 
-            Config::MAX_ENROLLMENT_RATES[before][own_scale];
-        ((self.enroll as f64) * self.over_rate * limit_change_rate).ceil() as usize
+            }
+            let limit_change_rate = 
+                Config::MAX_ENROLLMENT_RATES[before_current.1][own_scale] / 
+                Config::MAX_ENROLLMENT_RATES[before_current.0][own_scale];
+            
+            ((self.enroll as f64) * self.over_rate * limit_change_rate).ceil() as usize
+        } else {
+            self.enroll as usize
+        }
     }
 
     fn college_scale(&self) -> usize {
