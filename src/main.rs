@@ -345,7 +345,7 @@ fn settle(epoch: i32, students: &Vec<Student>, colleges: &Vec<College>, status: 
     };
 
     //大学を偏差値順にソート
-    new_colleges.par_sort_unstable_by(|a, b| a.score.cmp(&b.score));
+    new_colleges.par_sort_by(|a, b| a.score.cmp(&b.score));
     //index振り直し
     for i in 0..new_colleges.len() {new_colleges[i].index = i}
 

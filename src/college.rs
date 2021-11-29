@@ -62,7 +62,7 @@ impl College {
             colleges.push(college);
         }
         // 偏差値の昇順にソート
-        colleges.par_sort_unstable_by(|a, b| a.score.cmp(&b.score));
+        colleges.par_sort_by(|a, b| a.score.cmp(&b.score));
         for i in 0..colleges.len() {colleges[i].index = i}
         Ok(colleges)    
     }
@@ -71,7 +71,10 @@ impl College {
     pub fn update(&self, result: &CollegeResult) -> College{
         let mut college = self.clone();
         college.epoch += 1; //1年分進める
-        college.dev = result.new_deviation;
+        //フラグtrue時のみ大学偏差値を入学者偏差値で更新する
+        if Config::get().update_dev {
+            college.dev = result.new_deviation;
+        }
         college.score = (college.dev * 1000.0).round() as i32;
 
         college.dev_history.push(result.new_deviation);
@@ -81,32 +84,16 @@ impl College {
         //次年度の合格者超過率
         //入試結果を元に次年度のあるべき（辞退者が出ても入学定員になる）定員超過率を計算
         //合格者数/入学者数
-        college.over_rate = (result.enroll_1st_count + result.enroll_add_count) as f64 /
-            result.admissons as f64; 
+        //2021.11.22 学習率を導入し、変化量*lrだけ増減させる。
+        college.over_rate = result.enroll_1st_count  as f64 /  result.admissons as f64; 
 
-        // 3年連続で定員割れした私立を公立にする
-        // let limit = 3;
-        // if college.institute == Config::PRIVATE {
-        //     let mut history = college.fillrate_history.clone();
-        //     let mut count = 0;
-        //     for _i in 0..history.len(){
-        //         match history.pop() {
-        //             Some(rate) if rate <  1.0  => count += 1,
-        //             Some(_) => {
-        //                 count = 0;
-        //                 break;
-        //             },
-        //             None => break,
-        //         }
-        //         if count >= limit{
-        //             break;
-        //         }
-        //     }
-        //     if count >= limit{
-        //         college.institute = Config::PUBLIC;
-        //         college.saved = true;
-        //     }
-        // }
+        // 2021.11.23 接地の場合、2年目以降の新しい入学定員、収容定員を設定する。最終年度は不要。
+        if Config::get().grounding && college.epoch < Config::get().epochs as usize{
+            if let Some((new_enroll, new_capa)) = Config::get().enroll_capa_dics[self.epoch].get(&self.cid){
+                college.enroll = *new_enroll as u32;
+                college.capa = *new_capa as u32;
+            }
+        }
 
         college
     }
@@ -125,7 +112,7 @@ impl College {
             .map(|x| (x, students[*x].c_map.get(&self.index).unwrap()))
             .collect();
         //3.成績の良い順に合格者を決定
-        id_and_scores.sort_unstable_by(|a, b| b.1.cmp(a.1));
+        id_and_scores.sort_by(|a, b| b.1.cmp(a.1));
         // println!("Coll idx: {:?} enroll_num:{:?} id&score.len :{:?}", self.index, enroll_num, id_and_scores.len());
         let s_vec = (0..min(id_and_scores.len(), self.new_enroll_num)).into_iter()
             .map(|x|*(id_and_scores[x].0)).collect::<Vec<Sid>>();
@@ -143,7 +130,7 @@ impl College {
             .map(|x| (x, students[*x].c_map.get(&self.index).unwrap()))
             .collect();
         //3.成績の良い順に合格者を決定
-        id_and_scores.sort_unstable_by(|a, b| b.1.cmp(a.1));
+        id_and_scores.sort_by(|a, b| b.1.cmp(a.1));
         // println!("Coll idx: {:?} enroll_num:{:?} id&score.len :{:?}", self.index, enroll_num, id_and_scores.len());
         let s_vec = (0..min(id_and_scores.len(), self.new_enroll_num)).into_iter()
             .map(|x|*(id_and_scores[x].0)).collect::<Vec<Sid>>();
@@ -183,7 +170,7 @@ impl College {
                 .map(|(x, _)| (x, students[*x].c_map.get(&self.index).unwrap()))
                 .collect();
             //3.成績の良い順に合格者を決定
-            id_and_scores.sort_unstable_by(|a, b| b.1.cmp(a.1));
+            id_and_scores.sort_by(|a, b| b.1.cmp(a.1));
             // println!("Coll idx: {:?} enroll_num:{:?} id&score.len :{:?}", self.index, enroll_num, id_and_scores.len());
             let s_vec = (0..min(id_and_scores.len(), limit)).into_iter()
                 // 2021.10.5 偏差値による足切り
@@ -198,33 +185,40 @@ impl College {
     // 今年度の合格者数を計算
     fn enroll_num(&self) -> usize{
         //2021.11.21 私立のみ変化。国公立は1.0固定
-        if self.institute == Config::PRIVATE {
-            // 2016(0)以前と2016(1)の増減率を取得。
-            let before_current: (usize, usize);
-            let own_scale = self.college_scale();
-            let this_year = Config::get().start_year + self.epoch;
-            if Config::get().small_college_rate == 0.0 { // 2021.11.19 小規模優遇なし
-                before_current = match this_year{
-                    0..=2015    => (0,0),//変化なし
-                    2016..=2018 => (this_year - 2016, this_year - 2015),
-                    _ => (3,3), //変化なし
-                };
-            } else {
-                before_current = match this_year{
-                    0..=2015    => (0,0),//変化なし
-                    2016..=2022 => (this_year - 2016, this_year - 2015),
-                    _ => (4,4), //変化なし
-            };
-
-            }
-            let limit_change_rate = 
-                Config::MAX_ENROLLMENT_RATES[before_current.1][own_scale] / 
-                Config::MAX_ENROLLMENT_RATES[before_current.0][own_scale];
-            
-            ((self.enroll as f64) * self.over_rate * limit_change_rate).ceil() as usize
-        } else {
-            self.enroll as usize
+        if self.institute != Config::PRIVATE {
+            return self.enroll as usize;
         }
+        // 2016(0)以前と2016(1)の増減率を取得。
+        let before_current: (usize, usize);
+        let own_scale = self.college_scale();
+        let this_year = Config::get().start_year + self.epoch;
+        if Config::get().small_college_rate == 0.0 { // 2021.11.19 小規模優遇なし
+            before_current = match this_year{
+                0..=2015    => (0,0),//変化なし
+                2016..=2018 => (this_year - 2016, this_year - 2015),
+                _ => (3,3), //変化なし
+            };
+        } else {
+            before_current = match this_year{
+                0..=2015    => (0,0),//変化なし
+                2016..=2022 => (this_year - 2016, this_year - 2015),
+                _ => (4,4), //変化なし
+            };
+        };
+        let limit_change_rate = 
+            Config::MAX_ENROLLMENT_RATES[before_current.1][own_scale] / 
+            Config::MAX_ENROLLMENT_RATES[before_current.0][own_scale];
+
+        // 2021.11.22 シンプルに現在の超過率を適応する
+        // let index =  match this_year{
+        //     0..=2015    => 0,
+        //     2016..=2022 => this_year - 2015,
+        //     _ => 4,
+        // };
+        
+        // let limit = Config::MAX_ENROLLMENT_RATES[index][own_scale];
+        
+        ((self.enroll as f64) * self.over_rate * limit_change_rate).ceil() as usize
     }
 
     fn college_scale(&self) -> usize {
@@ -265,4 +259,16 @@ pub struct CollegeResult{
     pub admissons: i32, //最終入学者数
     pub new_deviation: f64, //入学者偏差値平均
     pub payments: i32, //入学金徴収総額
+}
+
+// 2021.11.23 入学定員・収容人数CSV
+#[derive(Debug,Clone,Default,Deserialize)]
+pub struct EnrollAndCapa{
+    pub cid: Cid, // 旺文社大学番号
+
+    #[serde(alias = "入学定員数")]
+    pub enroll: i32, //入学定員
+
+    #[serde(alias = "収容定員数")]
+    pub capa: i32,  //大学全体の収容人数
 }

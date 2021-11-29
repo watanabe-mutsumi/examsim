@@ -1,5 +1,6 @@
 /target
 /output
+/old
 .vscode
 *.csv
 *.txt
@@ -10,12 +11,3 @@ memo.md
 config04.toml
 his＊.json
 config05.toml
-hist_saved.json
-hist.json
-test_sparse.mm
-histH01.json
-histH02Change.json
-histOct.json
-histOct2.json
-histOct3.json
-histOct4.json

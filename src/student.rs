@@ -33,14 +33,13 @@ pub struct Student{
 }
 
 impl Student {
-    pub fn new(fscore: f64, prev_rng: &mut Xoshiro256StarStar) -> Self{
-        prev_rng.jump();
+    pub fn new(fscore: f64, seed: u64) -> Self{
         Self{id: 0,
             score: (fscore * 1000.0).round() as i32,
             c_map: HashMap::new(),
             pattern: ApplyPattern::Both,
             admission: None,
-            rng: prev_rng.clone()
+            rng: Xoshiro256StarStar::seed_from_u64(seed)
         }
     }
 
@@ -52,9 +51,10 @@ impl Student {
             .take(conf.student_number[epoch]) //今回の年度の志願者数分生成
             .collect::<Vec<f64>>()
             .into_iter()
-            .map(|x| Student::new(x, &mut rng1))
+            .enumerate()
+            .map(|(i, x)| Student::new(x, conf.random_seed + i as u64))
             .collect();
-        students.par_sort_unstable_by(|a, b| a.score.cmp(&b.score));
+        students.par_sort_by(|a, b| a.score.cmp(&b.score));
         students.into_par_iter()
             .enumerate()
             .map(|(i, mut x)| {
@@ -216,7 +216,7 @@ impl Student {
                 let mut apply_colleges: Vec::<&College> = self.c_map.iter()
                     .map(|(key, _)| &colleges[*key])
                     .collect();
-                apply_colleges.sort_unstable_by(|a, b| b.score.cmp(&a.score));
+                apply_colleges.sort_by(|a, b| b.score.cmp(&a.score));
                 select_college = apply_colleges[0].index;
     
 
@@ -262,7 +262,7 @@ impl Student {
         }
 
         //保留中の大学から最も偏差値の高い大学に入学
-        reserved_colleges.sort_unstable_by(|a, b| b.score.cmp(&a.score));
+        reserved_colleges.sort_by(|a, b| b.score.cmp(&a.score));
         self.admission = Some(reserved_colleges[0].index);
         self.admission
     }
@@ -295,7 +295,7 @@ impl Student {
             return None
         }
 
-        passed_colleges.sort_unstable_by(|a, b| b.score.cmp(&a.score));
+        passed_colleges.sort_by(|a, b| b.score.cmp(&a.score));
         self.admission = Some(passed_colleges[0].index);
         self.admission
     }

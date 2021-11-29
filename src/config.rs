@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::process::exit;
 use anyhow::{Context, Result};
 use clap::{App, Arg, crate_version};
@@ -6,6 +7,10 @@ use std::io::Read;
 use serde::Deserialize;
 use once_cell::sync::OnceCell;
 use chrono::Local;
+use csv::ReaderBuilder;
+
+
+use crate::college::EnrollAndCapa;
 
 // グローバルな設定情報オブジェクト
 pub static CONFIG: OnceCell<Config> = OnceCell::new();
@@ -36,6 +41,14 @@ pub struct Config{
     pub college_select_by_enroll: bool,
 
     pub small_college_rate: f64,
+
+    pub update_dev: bool,
+
+    pub enroll_capa_csv_dir: String,
+    pub enroll_capa_csv_name: String,
+    pub enroll_capa_dics: Vec<HashMap<usize, (i32,i32)>>,
+
+    pub grounding: bool,
 }
 
 impl Config {
@@ -94,12 +107,22 @@ impl Config {
         if let Some(filename) = matches.value_of("CONFIG_FILE") {
             let mut f = fs::File::open(filename).expect("config toml file not found");
             eprintln!("    設定ファイル = {:?}", filename);
+
             let mut contents = String::new();
             f.read_to_string(&mut contents).expect("config file read error");
             let mut cfg: Config = toml::from_str(&contents).unwrap();
+
             cfg.output_dir = Config::get_output_dirname(& cfg)?;
+            eprintln!("    出力先Dir = {:?}", cfg.output_dir);
+
+            // 2022.11.23 接地用　2年目以降定員情報Vec作成
+            if cfg.grounding {
+                cfg.enroll_capa_dics = Config::make_enroll_capa_info(&cfg)?;
+            }
+            
             //設定ファイルを出力先Dirにコピー
             fs::copy(filename, format!("{}/{}",cfg.output_dir, filename)).unwrap();
+
             CONFIG.set(cfg).unwrap();
             Ok(())
         } else {
@@ -120,5 +143,22 @@ impl Config {
             Err(e) => Err(e),
             Ok(_) => Ok(new_dir + "/"),
         }
+    }
+
+    // 2021.11.23 定員情報作成
+    pub fn make_enroll_capa_info(&self) -> Result<Vec<HashMap<usize, (i32,i32)>>>{
+        let mut v = vec![];
+        for i in 1..self.epochs{
+            let mut h = HashMap::new();
+            let year = self.start_year + i as usize;
+            let path = format!("{}{:04}{}", self.enroll_capa_csv_dir, year, self.enroll_capa_csv_name);
+            let mut rdr = ReaderBuilder::new().from_path(path)?;
+            for result in rdr.deserialize(){
+                let e: EnrollAndCapa = result?;
+                h.insert(e.cid, (e.enroll, e.capa));
+            }
+            v.push(h);
+        }
+        Ok(v)
     }
 }
