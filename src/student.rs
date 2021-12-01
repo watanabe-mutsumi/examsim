@@ -182,16 +182,20 @@ impl Student {
     }
 
     // 入学試験。自分の偏差値 + 標準正規分布誤差を返す。
+    // 2021.12.01 誤差をN(0, 生成時標準偏差^2)に変更
     fn exam(&mut self) -> i32{
-        self.score + (self.rng.sample::<f32, _>(StandardNormal) * 1000.0).round() as i32
+        let normal = Normal::new(0.0, Config::get().student_dev_sigma).unwrap();
+        // self.score + (self.rng.sample::<f32, _>(StandardNormal) * 1000.0).round() as i32
+        self.score + (normal.sample(& mut self.rng) * 1000.0).round() as i32
     }
 
     //一様分布又は入学定員に比例した確率で大学を選択
+    // 2021.11.29 入学定員ではなく志願者数に比例させる
     fn random_select(&mut self, proportional: bool, size: usize, select_number: usize, offset: usize, colleges: &[College]) -> Vec<usize>{
         if proportional{
             let mut v: Vec<usize> = Vec::new();
             let choice = (0..size).into_iter().map(|x|x + offset).collect::<Vec<usize>>();
-            let weight = choice.iter().map(|x| colleges[*x].enroll).collect::<Vec<u32>>();
+            let weight = choice.iter().map(|x| colleges[*x].applicant_num).collect::<Vec<u32>>();
             let dist = WeightedIndex::new(weight).unwrap();
             while v.len() < select_number{
                 let bingo = choice[dist.sample(&mut self.rng)];
@@ -220,11 +224,15 @@ impl Student {
                 select_college = apply_colleges[0].index;
     
 
-                //意中の大学には入学、それ以外には保留の値をもつベクトルを返す
+                //合格大学に対し、私立専願で、最上位の大学が合格なら入学、それ以外には保留の値をもつベクトルを返す
                 passed_ids.iter()
                     .map(|cid|{
                         (*cid, (self.id, if *cid == select_college {
-                                 Config::ADMISSION_1ST
+                                // 2021.12.01 私立専願なら決定、国公立併願なら保留
+                                    match self.pattern {
+                                        ApplyPattern::PrivateOnly => Config::ADMISSION_1ST,
+                                        _ => Config::RESERVE,
+                                    }
                                 }else{
                                  Config::RESERVE
                                 }))})

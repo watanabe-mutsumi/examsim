@@ -1,3 +1,7 @@
+######################################################
+# 2021.12.01 21:30 偏差値更新なし
+######################################################
+
 #大学初期値CSVファイル
 initial_college_csv = "../../sim/u2014v04.csv"
 
@@ -84,4 +88,4 @@ college_select_by_enroll = true
 small_college_rate = 0
 
 #大学偏差値更新有無
-update_dev = true
+update_dev = false

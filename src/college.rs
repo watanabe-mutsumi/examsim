@@ -24,6 +24,11 @@ pub struct College{
     pub dev: f64, // 偏差値
     pub enroll: u32, //　入学定員数
     pub over_rate: f64, //合格者超過率
+    pub applicant_num: u32, // 2021.11.29 志願者数
+
+    #[serde(default)]
+    pub current_rate: f64, // 2021.11.29 現在の入学定員超過率制限値
+
     #[serde(default)]
     pub score: i32, //ソート用に1000倍して整数化した偏差値
     #[serde(default)]
@@ -58,6 +63,10 @@ impl College {
             college.score = (college.dev * 1000.0).round() as i32;
             college.dev_history.push(college.dev);//シミュレーション前の偏差値
             college.fillrate_history.push(0.0);//シミュレーション前の充足率は0にしておく
+            // 2021.11.29 志願者数が0（欠損値）の場合は入学定員を代用する
+            if college.applicant_num == 0 {
+                college.applicant_num = college.enroll;
+            }
 
             colleges.push(college);
         }
@@ -80,6 +89,9 @@ impl College {
         college.dev_history.push(result.new_deviation);
         //定員充足率　入学者÷定員
         college.fillrate_history.push( result.admissons as f64 / college.enroll as f64 );
+
+        // 2021.11.29 志願者数更新
+        college.applicant_num = result.apply_count as u32;
 
         //次年度の合格者超過率
         //入試結果を元に次年度のあるべき（辞退者が出ても入学定員になる）定員超過率を計算
@@ -150,10 +162,13 @@ impl College {
                                 *val == Config::R_ADMISSION_RSV )
             .count();
         
-        let diff = if current_admisson_num > self.enroll as usize{
+        // 2021.11.29 入学定員でなく、入学定員×定員超過率の数値をベースにする。
+        let base_line = (self.enroll as f64 * self.current_rate).ceil() as usize;
+        
+        let diff = if current_admisson_num > base_line{
                 0 as usize
             }else{
-                self.enroll as usize - current_admisson_num
+                base_line  - current_admisson_num
             };
         if  diff > 0 { //不足
             //差分に追加合格用人数を上乗せ
@@ -183,7 +198,7 @@ impl College {
     }
 
     // 今年度の合格者数を計算
-    fn enroll_num(&self) -> usize{
+    fn enroll_num(&mut self) -> usize{
         //2021.11.21 私立のみ変化。国公立は1.0固定
         if self.institute != Config::PRIVATE {
             return self.enroll as usize;
@@ -205,9 +220,8 @@ impl College {
                 _ => (4,4), //変化なし
             };
         };
-        let limit_change_rate = 
-            Config::MAX_ENROLLMENT_RATES[before_current.1][own_scale] / 
-            Config::MAX_ENROLLMENT_RATES[before_current.0][own_scale];
+        self.current_rate = Config::MAX_ENROLLMENT_RATES[before_current.1][own_scale];
+        let limit_change_rate = self.current_rate / Config::MAX_ENROLLMENT_RATES[before_current.0][own_scale];
 
         // 2021.11.22 シンプルに現在の超過率を適応する
         // let index =  match this_year{
