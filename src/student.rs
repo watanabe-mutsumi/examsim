@@ -5,7 +5,7 @@ use crate::Matrix;
 use rayon::prelude::*;
 use rand::Rng;
 use rand::distributions::{Distribution,WeightedIndex};
-use rand_distr::{Normal, StandardNormal};
+use rand_distr::Normal; //StandardNormal
 use rand::seq::index::sample;
 use rand_xoshiro::rand_core::SeedableRng;
 use rand_xoshiro::Xoshiro256StarStar;

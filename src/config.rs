@@ -40,7 +40,7 @@ pub struct Config{
 
     pub college_select_by_enroll: bool,
 
-    pub small_college_rate: f64,
+    pub small_college_support: bool,
 
     pub update_dev: bool,
 
@@ -49,6 +49,8 @@ pub struct Config{
     pub enroll_capa_dics: Vec<HashMap<usize, (i32,i32)>>,
 
     pub grounding: bool,
+
+    pub new_limits: [f64; 3],
 }
 
 impl Config {
@@ -81,8 +83,8 @@ impl Config {
     // pub const PUBLIC: u8 = 2; //公立
     pub const PRIVATE: u8 = 3; //私立
 
-    //入学定員超過率の年度別上限
-    pub const MAX_ENROLLMENT_RATES: [[f64; 3]; 8] = [
+    //入学定員超過率の年度別上限  <= 2021まで
+    pub const MAX_ENROLLMENT_RATES: [[f64; 3]; 7] = [
         // 大学規模L M S
         [1.20, 1.30, 1.30], // < 2016
         [1.17, 1.27, 1.30], //  2016
@@ -91,7 +93,6 @@ impl Config {
         [1.10, 1.20, 1.30], //  2019
         [1.10, 1.20, 1.30], //  2020
         [1.10, 1.20, 1.30], //  2021
-        [1.10, 1.20, 1.40], //  2022から小規模を1.4に緩和　2021.11.19
     ];
 
     ///////////////////////////////////////////////////////
@@ -119,7 +120,7 @@ impl Config {
             if cfg.grounding {
                 cfg.enroll_capa_dics = Config::make_enroll_capa_info(&cfg)?;
             }
-            
+
             //設定ファイルを出力先Dirにコピー
             fs::copy(filename, format!("{}/{}",cfg.output_dir, filename)).unwrap();
 

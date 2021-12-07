@@ -207,7 +207,9 @@ impl College {
         let before_current: (usize, usize);
         let own_scale = self.college_scale();
         let this_year = Config::get().start_year + self.epoch;
-        if Config::get().small_college_rate == 0.0 { // 2021.11.19 小規模優遇なし
+        let mut limit_table = Config::MAX_ENROLLMENT_RATES.to_vec();
+        limit_table.push(Config::get().new_limits);
+        if !Config::get().small_college_support { // 2021.11.19 小規模優遇なし
             before_current = match this_year{
                 0..=2015    => (0,0),//変化なし
                 2016..=2018 => (this_year - 2016, this_year - 2015),
@@ -220,8 +222,8 @@ impl College {
                 _ => (4,4), //変化なし
             };
         };
-        self.current_rate = Config::MAX_ENROLLMENT_RATES[before_current.1][own_scale];
-        let limit_change_rate = self.current_rate / Config::MAX_ENROLLMENT_RATES[before_current.0][own_scale];
+        self.current_rate = limit_table[before_current.1][own_scale];
+        let limit_change_rate = self.current_rate / limit_table[before_current.0][own_scale];
 
         // 2021.11.22 シンプルに現在の超過率を適応する
         // let index =  match this_year{
