@@ -29,7 +29,7 @@ pub struct Student{
     pub c_map: HashMap<usize, i32>, //出願した大学のインデックスと、試験成績のマップ
     pub pattern: ApplyPattern, //併願パターン　
     pub admission: Option<Cid>, //入学を決めた大学のインデックス
-    pub rng: Xoshiro256StarStar,
+    pub rng: Xoshiro256StarStar, //乱数生成器
 }
 
 impl Student {
@@ -62,7 +62,7 @@ impl Student {
                 x.id = i;
                 //併願パターンを決定
                 x.pattern = if x.rng.gen_bool(conf.national_prob){
-                    ApplyPattern::Both.clone() //国立も受験
+                    ApplyPattern::Both //国立も受験
                 } else {
                     ApplyPattern::PrivateOnly
                 };
@@ -184,8 +184,8 @@ impl Student {
     // 入学試験。自分の偏差値 + 標準正規分布誤差を返す。
     // 2021.12.01 誤差をN(0, 生成時標準偏差^2)に変更
     fn exam(&mut self) -> i32{
-        let normal = Normal::new(0.0, Config::get().student_dev_sigma).unwrap();
         // self.score + (self.rng.sample::<f32, _>(StandardNormal) * 1000.0).round() as i32
+        let normal = Normal::new(0.0, Config::get().student_dev_sigma).unwrap(); // 2021.12.11 正規分布生成器
         self.score + (normal.sample(& mut self.rng) * 1000.0).round() as i32
     }
 
@@ -227,21 +227,27 @@ impl Student {
                 //合格大学に対し、私立専願で、最上位の大学が合格なら入学、それ以外には保留の値をもつベクトルを返す
                 passed_ids.iter()
                     .map(|cid|{
-                        (*cid, (self.id, if *cid == select_college {
+                        (*cid, (self.id, 
+                                if *cid == select_college {
                                 // 2021.12.01 私立専願なら決定、国公立併願なら保留
                                     match self.pattern {
-                                        ApplyPattern::PrivateOnly => Config::ADMISSION_1ST,
+                                        ApplyPattern::PrivateOnly => {
+                                            self.admission = Some(*cid);
+                                            Config::ADMISSION_1ST
+                                            },
                                         _ => Config::RESERVE,
                                     }
                                 }else{
-                                 Config::RESERVE
-                                }))})
+                                    Config::RESERVE
+                                }
+                                )
+                        )})
                     .collect()
             }
         }
     }
 
-    // 合格保留中大学から入学する大学を選択。
+    // 国公立合格発表を受けて入学大学を選択．国公立に合格なら入学．
     pub fn admission2(&mut self, _conf: &Config, colleges: &[College], matrix: &Matrix, idx: Sid) -> Option<Cid>{
         let statuss: Vec<(Cid,Option<&u8>)> = matrix.outer_view(idx).unwrap().indices().iter()
             .map(|col| (*col, matrix.get(idx, *col)))
@@ -251,8 +257,8 @@ impl Student {
         for (cid, val) in statuss {
             if let Some(v) = val {
                 match *v{
-                    //第一志望（私立または国公立）に合格している
-                    Config::R_ADMISSION_1ST | Config::R_ADMISSION_2ND => {
+                    //国公立に合格している
+                    Config::R_ADMISSION_2ND => {
                         self.admission = Some(cid);
                         return None //既に決定しているので
                     },
@@ -307,10 +313,11 @@ impl Student {
         self.admission = Some(passed_colleges[0].index);
         self.admission
     }
+
     //指定大学の受験時点数（偏差値）を取得
-    pub fn exam_dev(&self, cid: Cid) -> &i32{
-        self.c_map.get(&cid).unwrap()
-    }
+    // pub fn exam_dev(&self, cid: Cid) -> &i32{
+    //     self.c_map.get(&cid).unwrap()
+    // }
 }
 
 // シミュレーション結果CSV

@@ -13,7 +13,11 @@ pub type Cid = usize; //大学ID
 #[derive(Debug,Clone,Default,Deserialize,Serialize)]
 pub struct College{
     #[serde(default)]
+    pub senario: i32, //2021.12.11 本番シミュレーションシナリオ番号．1-5. 0は設置
+    #[serde(default)]
     pub epoch: usize, //イテレーション番号。0オリジン。
+    #[serde(default)]
+    pub seed: u64, //2021.12.11 ランダムシード
 
     pub cid: Cid, //旺文社の大学番号
     pub name: String,  //  大学名
@@ -24,7 +28,11 @@ pub struct College{
     pub dev: f64, // 偏差値
     pub enroll: u32, //　入学定員数
     pub over_rate: f64, //合格者超過率
-    pub applicant_num: u32, // 2021.11.29 志願者数
+    pub applicant_num: u32, // 2021.11.29 前年度志願者数
+    pub passed_num: u32, // 2021.12.12 前年度合格者数
+    pub adm_num: u32, // 2021.12.12 前年度入学者数
+    #[serde(default)]
+    pub own_scale: usize, // 2021.12.11 大学規模
 
     #[serde(default)]
     pub current_rate: f64, // 2021.11.29 現在の入学定員超過率制限値
@@ -46,6 +54,8 @@ pub struct College{
     #[serde(default)]
     pub dev_history: Vec<f64>, //各ステップの偏差値履歴。
     #[serde(default)]
+    pub adm_history: Vec<i32>, //各ステップの入学者数履歴。
+    #[serde(default)]
     pub fillrate_history: Vec<f64>, //各ステップの定員従属率履歴。
 
 
@@ -61,8 +71,11 @@ impl College {
         for result in rdr.deserialize(){
             let mut college: Self = result?;
             college.score = (college.dev * 1000.0).round() as i32;
+            college.seed = conf.random_seed;
+            college.senario = conf.senario;
             college.dev_history.push(college.dev);//シミュレーション前の偏差値
             college.fillrate_history.push(0.0);//シミュレーション前の充足率は0にしておく
+            college.adm_history.push(0);//シミュレーション前の入学者数は0にしておく
             // 2021.11.29 志願者数が0（欠損値）の場合は入学定員を代用する
             if college.applicant_num == 0 {
                 college.applicant_num = college.enroll;
@@ -85,10 +98,15 @@ impl College {
             college.dev = result.new_deviation;
         }
         college.score = (college.dev * 1000.0).round() as i32;
+        //2021.12.12 入学者数，合格者数を更新
+        college.adm_num = result.admissons as u32;
+        college.passed_num = result.enroll_1st_count as u32 + result.enroll_add_count as u32;
 
         college.dev_history.push(result.new_deviation);
         //定員充足率　入学者÷定員
         college.fillrate_history.push( result.admissons as f64 / college.enroll as f64 );
+        //2021.12.11 入学者履歴
+        college.adm_history.push(result.admissons as i32);
 
         // 2021.11.29 志願者数更新
         college.applicant_num = result.apply_count as u32;
@@ -203,9 +221,9 @@ impl College {
         if self.institute != Config::PRIVATE {
             return self.enroll as usize;
         }
-        // 2016(0)以前と2016(1)の増減率を取得。
+
+        self.own_scale = self.college_scale();
         let before_current: (usize, usize);
-        let own_scale = self.college_scale();
         let this_year = Config::get().start_year + self.epoch;
         let mut limit_table = Config::MAX_ENROLLMENT_RATES.to_vec();
         limit_table.push(Config::get().new_limits);
@@ -218,23 +236,27 @@ impl College {
         } else {
             before_current = match this_year{
                 0..=2015    => (0,0),//変化なし
-                2016..=2022 => (this_year - 2016, this_year - 2015),
+                2016..=2031 => (this_year - 2016, this_year - 2015),
                 _ => (4,4), //変化なし
             };
         };
-        self.current_rate = limit_table[before_current.1][own_scale];
-        let limit_change_rate = self.current_rate / limit_table[before_current.0][own_scale];
+        self.current_rate = limit_table[before_current.1][self.own_scale];
 
-        // 2021.11.22 シンプルに現在の超過率を適応する
-        // let index =  match this_year{
-        //     0..=2015    => 0,
-        //     2016..=2022 => this_year - 2015,
-        //     _ => 4,
-        // };
-        
-        // let limit = Config::MAX_ENROLLMENT_RATES[index][own_scale];
-        
-        ((self.enroll as f64) * self.over_rate * limit_change_rate).ceil() as usize
+        //2021.12.12 アルゴリズム改善．旧バージョンも残す
+        if Config::get().enroll_algo_version == 2 {
+            // 歩留率計算．入学者数または合格者数が欠損（0）の場合は2014年度の私立大学平均を使う
+            let yield_rate =  if self.passed_num == 0 || self.adm_num == 0{
+                    Config::get().mean_yield_rate
+                } else {
+                    self.adm_num as f64 / self.passed_num as f64
+                };
+            ((self.enroll as f64 * self.current_rate) / yield_rate).round() as usize
+            
+        } else {
+            // 2016(0)以前と2016(1)の増減率を取得。
+            let limit_change_rate = self.current_rate / limit_table[before_current.0][self.own_scale];        
+            ((self.enroll as f64) * self.over_rate * limit_change_rate).round() as usize
+        }
     }
 
     fn college_scale(&self) -> usize {

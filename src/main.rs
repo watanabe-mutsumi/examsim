@@ -44,7 +44,9 @@ fn run(conf: &Config, timer: &Instant) -> Result<()>{
         match step(epoch, &mut colleges, conf){
             Ok((new_colls,college_result, student_result)) =>{
                 colleges = new_colls;
-                output_result(epoch, &college_result, &student_result)?;
+                if conf.logging{
+                    output_result(epoch, &college_result, &student_result)?;
+                }
             },
             Err(e) => eprintln!("step error epoch=[{:02}] msg=[{:?}]",epoch, e),
         }
@@ -82,7 +84,7 @@ fn step(epoch: i32, colleges: &mut Vec<College>, conf: &Config)
     let status = &status + &(apply_matrix.transpose_into());
     let status = &status + &(adm1_matrix.transpose_into());
 
-    //Step:5 保留中私立合格大学への入学（学生行動）
+    //Step:5 国公立入学または保留中私立合格大学への入学またはまち（学生行動）
     let adm2_matrix  = admission2(&mut students, &colleges, &status);
 
     //状態遷移マトリクス集計 => C x S
@@ -190,7 +192,7 @@ fn enroll3(colleges:&mut Vec<College>, students: &[Student], mat: &Matrix) -> Ma
 }
 
 
-// 保留中大学への入学
+// 国公立大学への入学
 fn admission2
     (students: &mut Vec<Student>, colleges: &[College], mat: &Matrix) -> Matrix { 
     let admission_list: Vec<(Cid, Sid)> = students.par_iter_mut()
@@ -208,7 +210,7 @@ fn admission2
     make_matrix(&admission_list, colleges.len(), students.len(), Config::ADMISSION_2ND)
 }
 
-// 追加合格大学への入学
+// 追加合格私立大学，保留中私立大学への入学
 fn admission3
     (students: &mut Vec<Student>, colleges: &[College], mat: &Matrix) -> Matrix { 
     let admission_list: Vec<(Cid, Sid)> = students.par_iter_mut()
@@ -252,6 +254,7 @@ fn settle(epoch: i32, students: &Vec<Student>, colleges: &Vec<College>, status: 
 
     let mut new_colleges: Vec<College> = Vec::new();
     let mut college_results: Vec<CollegeResult> = Vec::new();
+    let mut student_results: Vec<StudentResult> = Vec::new();
     let mut student_map = HashMap::new();
 
     for x in colleges {
@@ -264,11 +267,11 @@ fn settle(epoch: i32, students: &Vec<Student>, colleges: &Vec<College>, status: 
                     let counter = counters.entry(*val).or_insert(0);
                     *counter += 1;
 
-                    match *val{ //合格者の試験時偏差値を集計
+                    match *val{ //合格者の試験時偏差値を集計 => 2021.12.12 本来の偏差値に変更
                         Config::R_ADMISSION_1ST | Config::R_ADMISSION_2ND |
                         Config::R_ADMISSION_3RD | Config::R_ADMISSION_RSV => {
-                            new_dev += *students[*col].exam_dev(x.index) as f64 / 1000.0;
-                            // new_dev += students[*col].score as f64 / 1000.0;
+                            // new_dev += *students[*col].exam_dev(x.index) as f64 / 1000.0;
+                            new_dev += students[*col].score as f64 / 1000.0;
                         },
                         _ => (),
                     }
@@ -280,13 +283,15 @@ fn settle(epoch: i32, students: &Vec<Student>, colleges: &Vec<College>, status: 
 
         //
         // //学生別ログ出力用ハッシュマップ作成。key=Sid, value=Vec<(Cid,status)>
-        values.iter().for_each(|v|{
-            if let Some((sid, val)) = v{
-                let c_vec = student_map.entry(*sid).or_insert(Vec::new());
-                c_vec.push((x.index, *val));
+        if Config::get().logging {
+            values.iter().for_each(|v|{
+                if let Some((sid, val)) = v{
+                    let c_vec = student_map.entry(*sid).or_insert(Vec::new());
+                    c_vec.push((x.index, *val));
 
-            }
-        });
+                }
+            });
+        }
         //件数集計
         //一次合格者数
         let enroll_1st_count = count(&values, Config::ENROLL_1ST) + 
@@ -341,7 +346,9 @@ fn settle(epoch: i32, students: &Vec<Student>, colleges: &Vec<College>, status: 
         //次エポック用大学エージェント作成
         new_colleges.push(x.update(&college_result));
         //大学入試結果
-        college_results.push(college_result);
+        if Config::get().logging {
+            college_results.push(college_result);
+        }
     };
 
     //大学を偏差値順にソート
@@ -350,8 +357,9 @@ fn settle(epoch: i32, students: &Vec<Student>, colleges: &Vec<College>, status: 
     for i in 0..new_colleges.len() {new_colleges[i].index = i}
 
     //受験生入試結果生成
-    let student_results = student::settle(epoch, students, &mut student_map, &colleges);
-    
+    if Config::get().logging {
+        student_results = student::settle(epoch, students, &mut student_map, &colleges);
+    }
     
     Ok((new_colleges, college_results, student_results))
 }

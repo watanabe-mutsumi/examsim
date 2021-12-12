@@ -51,6 +51,14 @@ pub struct Config{
     pub grounding: bool,
 
     pub new_limits: [f64; 3],
+
+    pub logging: bool,
+
+    pub senario: i32, 
+    
+    pub enroll_algo_version: i32,
+
+    pub mean_yield_rate: f64,
 }
 
 impl Config {
@@ -102,7 +110,16 @@ impl Config {
     pub fn from_args() -> Result<()>{
         let matches = App::new("大学受験戦略シミュレーション")
             .version(crate_version!())
-            .arg(Arg::with_name("CONFIG_FILE").help("設定ファイル名"))
+            .arg(Arg::with_name("CONFIG_FILE") 
+                .help("設定ファイル名")
+                .required(true)
+            )
+            .arg(Arg::with_name("seed")              // フラグを定義
+                .help("random seed")                // ヘルプメッセージ
+                .short("s")                         // ショートコマンド
+                .long("seed")                       // ロングコマンド
+                .takes_value(true)
+            )
             .get_matches();
 
         if let Some(filename) = matches.value_of("CONFIG_FILE") {
@@ -113,10 +130,20 @@ impl Config {
             f.read_to_string(&mut contents).expect("config file read error");
             let mut cfg: Config = toml::from_str(&contents).unwrap();
 
-            cfg.output_dir = Config::get_output_dirname(& cfg)?;
-            eprintln!("    出力先Dir = {:?}", cfg.output_dir);
+            if cfg.logging{
+                cfg.output_dir = Config::get_output_dirname(& cfg)?;
+                eprintln!("    ログ出力先Dir = {:?}", cfg.output_dir);
+            } else {
+                eprintln!("    ログ出力なし");
+            }
 
-            // 2022.11.23 接地用　2年目以降定員情報Vec作成
+            // 2021.12.08 ランダムシードの指定があれば設定ファイルの指定を上書き
+            if let Some(seed) = matches.value_of("seed"){
+                cfg.random_seed = seed.parse::<u64>().unwrap();
+            }
+            eprintln!("    random seed = {:?}", cfg.random_seed);
+
+            // 2021.11.23 接地用　2年目以降定員情報Vec作成
             if cfg.grounding {
                 cfg.enroll_capa_dics = Config::make_enroll_capa_info(&cfg)?;
             }
