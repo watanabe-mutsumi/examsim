@@ -149,8 +149,10 @@ impl Config {
             }
 
             //設定ファイルを出力先Dirにコピー
-            fs::copy(filename, format!("{}/{}",cfg.output_dir, filename)).unwrap();
-
+            if cfg.logging{
+                fs::copy(filename, format!("{}/{}",cfg.output_dir, filename)).unwrap();
+            }
+            
             CONFIG.set(cfg).unwrap();
             Ok(())
         } else {

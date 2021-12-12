@@ -236,8 +236,8 @@ impl College {
         } else {
             before_current = match this_year{
                 0..=2015    => (0,0),//変化なし
-                2016..=2031 => (this_year - 2016, this_year - 2015),
-                _ => (4,4), //変化なし
+                2016..=2022 => (this_year - 2016, this_year - 2015),
+                _ => (7,7), //変化なし
             };
         };
         self.current_rate = limit_table[before_current.1][self.own_scale];
