@@ -92,7 +92,7 @@ grounding = false
 # 支援策を実行するか
 # シナリオ1 現状維持の場合false
 small_college_support = true
-senario = 1
+senario = 2
 
 #2021.12.07 支援する場合の
 # 2022以降の入学定員超過率 [大,中,小]
