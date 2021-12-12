@@ -1,5 +1,5 @@
 #大学初期値CSVファイル
-initial_college_csv = "../../sim/u2020v02.csv"
+initial_college_csv = "../../sim/u2020v03.csv"
 
 #接地用　２年目以降の入学定員・収容人数CSVフォルダー
 enroll_capa_csv_dir = "../../sim/capa/"
@@ -92,8 +92,18 @@ grounding = false
 # 支援策を実行するか
 # シナリオ1 現状維持の場合false
 small_college_support = true
+senario = 1
 
 #2021.12.07 支援する場合の
 # 2022以降の入学定員超過率 [大,中,小]
 # シナリオ2 一律厳格化
 new_limits = [1.0, 1.0, 1.0]
+
+#2021.12.11 ログ出力有無の制御
+logging = false
+
+#2021.12.12 合格者数計算ロジックのバージョン　1 or 2
+enroll_algo_version = 1
+
+#2021.12.12 2014年度の私立大学平均歩留率
+mean_yield_rate = 0.5293
