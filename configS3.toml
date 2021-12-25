@@ -103,7 +103,7 @@ new_limits = [1.1, 1.2, 1.4]
 logging = false
 
 #2021.12.12 合格者数計算ロジックのバージョン　1 or 2
-enroll_algo_version = 1
+enroll_algo_version = 2
 
 #2021.12.12 2014年度の私立大学平均歩留率
 mean_yield_rate = 0.5293
