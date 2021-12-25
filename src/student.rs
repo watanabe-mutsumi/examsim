@@ -186,7 +186,7 @@ impl Student {
     fn exam(&mut self) -> i32{
         // self.score + (self.rng.sample::<f32, _>(StandardNormal) * 1000.0).round() as i32
         let normal = Normal::new(0.0, Config::get().student_dev_sigma).unwrap(); // 2021.12.11 正規分布生成器
-        self.score + (normal.sample(& mut self.rng) * 1000.0).round() as i32
+        self.score + (normal.sample(& mut self.rng) * 100.0).round() as i32 // 2021.12.24揺らぎを10%にする
     }
 
     //一様分布又は入学定員に比例した確率で大学を選択

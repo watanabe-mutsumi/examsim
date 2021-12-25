@@ -92,12 +92,12 @@ grounding = false
 # 支援策を実行するか
 # シナリオ1 現状維持の場合false
 small_college_support = true
-senario = 2
+senario = 4
 
 #2021.12.07 支援する場合の
 # 2022以降の入学定員超過率 [大,中,小]
-# シナリオ2 一律厳格化
-new_limits = [1.0, 1.0, 1.0]
+# シナリオ4 大中厳格＋小規模のみ現状
+new_limits = [1.0, 1.0, 1.3]
 
 #2021.12.11 ログ出力有無の制御
 logging = false

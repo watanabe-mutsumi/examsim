@@ -80,7 +80,7 @@ impl Config {
     pub const R_DECLINE1_PAID: u8 = 7;  //入学金納付後辞退
     pub const R_DECLINE2: u8 = 65;  //追加合格辞退
     pub const R_RESERVED: u8 = 7;   //入学金納付後保留中
-    pub const R_ENROLL_3RD: u8 = 65;  //追加合格辞退
+    pub const R_ENROLL_3RD: u8 = 65;  //追加合格
     pub const R_ADMISSION_1ST: u8 = 11; //一次合格で私立入学
     pub const R_ADMISSION_2ND: u8 = 17; //国公立に合格し入学
     pub const R_ADMISSION_RSV: u8 = 39; //一次合格保留後私立入学
@@ -120,6 +120,11 @@ impl Config {
                 .long("seed")                       // ロングコマンド
                 .takes_value(true)
             )
+            .arg(Arg::with_name("logging")              // フラグを定義
+                .help("output log csv")                // ヘルプメッセージ
+                .short("l")                         // ショートコマンド
+                .long("log")                       // ロングコマンド
+            )
             .get_matches();
 
         if let Some(filename) = matches.value_of("CONFIG_FILE") {
@@ -130,6 +135,15 @@ impl Config {
             f.read_to_string(&mut contents).expect("config file read error");
             let mut cfg: Config = toml::from_str(&contents).unwrap();
 
+            // 2021.12.08 ランダムシードの指定があれば設定ファイルの指定を上書き
+            if let Some(seed) = matches.value_of("seed"){
+                cfg.random_seed = seed.parse::<u64>().unwrap();
+            }
+            
+            // 2021.12.23 ログ出力指定があれば設定ファイルの指定を上書き
+            if matches.is_present("logging"){
+                cfg.logging = true;
+            }
             if cfg.logging{
                 cfg.output_dir = Config::get_output_dirname(& cfg)?;
                 eprintln!("    ログ出力先Dir = {:?}", cfg.output_dir);
@@ -137,10 +151,6 @@ impl Config {
                 eprintln!("    ログ出力なし");
             }
 
-            // 2021.12.08 ランダムシードの指定があれば設定ファイルの指定を上書き
-            if let Some(seed) = matches.value_of("seed"){
-                cfg.random_seed = seed.parse::<u64>().unwrap();
-            }
             eprintln!("    random seed = {:?}", cfg.random_seed);
 
             // 2021.11.23 接地用　2年目以降定員情報Vec作成
@@ -152,7 +162,7 @@ impl Config {
             if cfg.logging{
                 fs::copy(filename, format!("{}/{}",cfg.output_dir, filename)).unwrap();
             }
-            
+
             CONFIG.set(cfg).unwrap();
             Ok(())
         } else {
@@ -168,7 +178,8 @@ impl Config {
 
     //データ出力ディレクトリを生成し、その相対パス名を返す。
     pub fn get_output_dirname(conf: &Config) -> Result<String>{
-        let new_dir = conf.output_dir_base.clone() + "/" + &Local::now().format("%Y%m%d%H%M%S").to_string();
+        let prefix = format!("s{0}r{1:<04}_", conf.senario, conf.random_seed);
+        let new_dir = conf.output_dir_base.clone() + "/" + &prefix + &Local::now().format("%Y_%m%d_%H%M%S").to_string();
         match fs::create_dir(new_dir.clone()).context("dir cannot create"){
             Err(e) => Err(e),
             Ok(_) => Ok(new_dir + "/"),

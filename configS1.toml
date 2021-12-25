@@ -91,8 +91,8 @@ grounding = false
 #2021.12.07 地方、小規模大学の入学定員超過率緩和
 # 支援策を実行するか
 # シナリオ1 現状維持の場合false
-small_college_support = true
-senario = 2
+small_college_support = false
+senario = 1
 
 #2021.12.07 支援する場合の
 # 2022以降の入学定員超過率 [大,中,小]
