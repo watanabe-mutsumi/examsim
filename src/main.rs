@@ -84,7 +84,7 @@ fn step(epoch: i32, colleges: &mut Vec<College>, conf: &Config)
     let status = &status + &(apply_matrix.transpose_into());
     let status = &status + &(adm1_matrix.transpose_into());
 
-    //Step:5 国公立入学または保留中私立合格大学への入学またはまち（学生行動）
+    //Step:5 国公立入学または保留中私立合格大学への入学（学生行動）
     let adm2_matrix  = admission2(&mut students, &colleges, &status);
 
     //状態遷移マトリクス集計 => C x S
@@ -192,7 +192,7 @@ fn enroll3(colleges:&mut Vec<College>, students: &[Student], mat: &Matrix) -> Ma
 }
 
 
-// 国公立大学への入学
+// 国公立大学への入学．国公立不合格で保留中私立があればそこに入学
 fn admission2
     (students: &mut Vec<Student>, colleges: &[College], mat: &Matrix) -> Matrix { 
     let admission_list: Vec<(Cid, Sid)> = students.par_iter_mut()
@@ -210,16 +210,21 @@ fn admission2
     make_matrix(&admission_list, colleges.len(), students.len(), Config::ADMISSION_2ND)
 }
 
-// 追加合格私立大学，保留中私立大学への入学
+// 追加合格私立大学への入学
 fn admission3
     (students: &mut Vec<Student>, colleges: &[College], mat: &Matrix) -> Matrix { 
     let admission_list: Vec<(Cid, Sid)> = students.par_iter_mut()
         .fold_with( Vec::new(),
             |mut acc, x|{
                 let idx = x.id;
-                if let Some(college_idx) = x.admission3(&Config::get(), colleges, mat, idx){
-                    acc.push((college_idx, idx));
-                }
+                // match x.admission{
+                //     Some(_) => (), //2021.12.29 既に入学決定なので何もしない
+                //     None => {
+                        if let Some(college_idx) = x.admission3(&Config::get(), colleges, mat, idx){
+                            acc.push((college_idx, idx));
+                        }
+                //     }
+                // }
                 acc
         })
         .reduce( || Vec::new(), append_vector);
@@ -313,7 +318,9 @@ fn settle(epoch: i32, students: &Vec<Student>, colleges: &Vec<College>, status: 
         let paid_only_count = count_eq(&counters, &Config::R_DECLINE1_PAID);
 
         //入学者総数
-        let admissons_all = admission_1st_count + admission_rsv_count + admission_add_count;
+        // 2021.12.29 
+        // let admissons_all = admission_1st_count + admission_rsv_count + admission_add_count;
+        let admissons_all = count_admissons(&values);
 
         //大学集計結果オブジェクト作成
         let college_result = CollegeResult{
@@ -426,4 +433,15 @@ fn count(values: &[Option<(Sid, u8)>], key: u8) -> i32{
     values.iter().map(|x| x.unwrap().1)
         .filter(|x| x & key != 0)
         .count() as i32
+}
+
+//bitマップ＆で一致する個数を取得する 2021.12.29 合格者バグかくにんの
+fn count_admissons(values: &[Option<(Sid, u8)>]) -> i32{
+    values.iter().map(|x| x.unwrap().1)
+        .filter(|x|
+             x & Config::ADMISSION_1ST != 0 ||
+             x & Config::ENROLL_2ND != 0 ||
+             x & Config::ADMISSION_2ND != 0 ||
+             x & Config::ADMISSION_3RD != 0
+        ).count() as i32
 }

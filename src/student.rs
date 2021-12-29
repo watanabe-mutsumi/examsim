@@ -248,23 +248,25 @@ impl Student {
     }
 
     // 国公立合格発表を受けて入学大学を選択．国公立に合格なら入学．
+    // 国公立不合格の場合，入学保留中の大学のあれば最高偏差値の私立へ入学すことにしてその大学indexを返す．
+    // 戻り値：国公立合格の場合，即入学決定なのでNone,国公立不合格で保留中大学もない場合もNone
     pub fn admission2(&mut self, _conf: &Config, colleges: &[College], matrix: &Matrix, idx: Sid) -> Option<Cid>{
         let statuss: Vec<(Cid,Option<&u8>)> = matrix.outer_view(idx).unwrap().indices().iter()
             .map(|col| (*col, matrix.get(idx, *col)))
             .collect();
 
-        let mut reserved_colleges: Vec<College> = Vec::new();
+        let mut reserved_colleges: Vec<&College> = Vec::new();
         for (cid, val) in statuss {
             if let Some(v) = val {
                 match *v{
                     //国公立に合格している
                     Config::R_ADMISSION_2ND => {
                         self.admission = Some(cid);
-                        return None //既に決定しているので
+                        return None //既に決定したので
                     },
                     //一次合格保留中の大学
                     Config::R_RESERVED => {
-                        reserved_colleges.push(colleges[cid].clone());
+                        reserved_colleges.push(&colleges[cid]);
                     },
                     _ => (),
                 }
@@ -287,18 +289,19 @@ impl Student {
             .map(|col| (*col, matrix.get(idx, *col)))
             .collect();
 
-        let mut passed_colleges: Vec<College> = Vec::new();
+        let mut passed_colleges: Vec<&College> = Vec::new();
         for (cid, val) in statuss {
             if let Some(v) = val {
                 match *v{
-                    //私立第一志望または国公立またに合格している
-                    Config::R_ADMISSION_1ST | Config::R_ADMISSION_2ND => {
+                    //私立第一志望または国公立また保留していた大学に合格している
+                    Config::R_ADMISSION_1ST | Config::R_ADMISSION_2ND |
+                    Config::R_ADMISSION_RSV => { // 2021.12.29 追加
                         self.admission = Some(cid);
                         return None //既に決定しているので
                     },
-                    //一次合格保留中か追加合格の大学
+                    //追加合格の大学
                     Config::R_ENROLL_3RD => {
-                        passed_colleges.push(colleges[cid].clone());
+                        passed_colleges.push(&colleges[cid]);
                     },
                     _ => (),
                 }
@@ -327,7 +330,8 @@ pub struct StudentResult{
     pub id: Sid,
     pub score: i32, //偏差値を1000倍した整数
     pub pattern: u8, //出願パターン
-    pub result: String, // cid:value_cid:valueの形式
+    pub college: i32, //2021.12.29 入学した大学の連番．全滅の場合は-1
+    pub result: String, // cid:value_cid:value
 }
 
 // 受験結果マトリクスを１学生１行の形式にしたデバック用受験生入試結果ベクターを作成
@@ -338,6 +342,7 @@ pub fn settle(epoch: i32, students: &[Student], smap: &mut HashMap<Sid,Vec<(Cid,
             id: s.id,
             score: s.score,
             pattern: s.pattern.clone() as u8,
+            college: match s.admission{Some(cid)=>cid as i32, _ => -1},
             result: if let Some(c_vec) = smap.get(&s.id){
                         c_vec.iter()
                             .map(|(cid, status)| 

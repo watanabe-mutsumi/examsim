@@ -1,8 +1,8 @@
 #大学初期値CSVファイル
-initial_college_csv = "../../sim/u2020v03.csv"
+initial_college_csv = "u2020v03.csv"
 
 #接地用　２年目以降の入学定員・収容人数CSVフォルダー
-enroll_capa_csv_dir = "../../sim/capa/"
+enroll_capa_csv_dir = "capa/"
 #接地用　入学定員・収容人数CSVファイル名のテンプレート。前にYYYYがつく。
 enroll_capa_csv_name = "_enroll_capa.csv"
 #接地用  入学定員・収容人数CSVを辞書化した配列のエントリーポイント。ダミー。

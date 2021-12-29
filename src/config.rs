@@ -139,7 +139,7 @@ impl Config {
             if let Some(seed) = matches.value_of("seed"){
                 cfg.random_seed = seed.parse::<u64>().unwrap();
             }
-            
+
             // 2021.12.23 ログ出力指定があれば設定ファイルの指定を上書き
             if matches.is_present("logging"){
                 cfg.logging = true;
@@ -159,9 +159,9 @@ impl Config {
             }
 
             //設定ファイルを出力先Dirにコピー
-            if cfg.logging{
-                fs::copy(filename, format!("{}/{}",cfg.output_dir, filename)).unwrap();
-            }
+            // if cfg.logging{
+            //     fs::copy(filename, format!("{}/{}",cfg.output_dir, filename)).unwrap();
+            // }
 
             CONFIG.set(cfg).unwrap();
             Ok(())
