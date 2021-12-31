@@ -6,7 +6,7 @@ use std::cmp::min;
 
 use crate::student::{Student, Sid};
 use crate::config::Config;
-use crate::Matrix;
+use crate::{Matrix};
 
 pub type Cid = usize; //大学ID
 
@@ -31,6 +31,9 @@ pub struct College{
     pub applicant_num: u32, // 2021.11.29 前年度志願者数
     pub passed_num: u32, // 2021.12.12 前年度合格者数
     pub adm_num: u32, // 2021.12.12 前年度入学者数
+    #[serde(default)]
+    pub applicate_num: u32, // 2021.12.31 前年度合格者数
+
     #[serde(default)]
     pub own_scale: usize, // 2021.12.11 大学規模
 
@@ -106,6 +109,9 @@ impl College {
         // college.passed_num = result.enroll_1st_count as u32 + result.enroll_add_count as u32;
         college.passed_num = result.enroll_1st_count as u32;
 
+        // 2021.12.31 今年度受験者を記録
+        college.applicate_num = result.apply_count as u32;
+
         college.dev_history.push(result.new_deviation);
         //定員充足率　入学者÷定員
         college.fillrate_history.push( result.admissons as f64 / college.enroll as f64 );
@@ -133,17 +139,18 @@ impl College {
 
     //私立一次合格者決定 
     pub fn enroll1(&mut self, conf: &Config, students: &[Student], candidates: &[usize]) -> Vec<Sid>{
-        // 1.前年度実績と今年度入学定員制限から合格者数を決定。
-        self.new_enroll_num = self.enroll_num();
+        // 1。受験者の配列を取得。
+        let mut id_and_scores: Vec<(&usize, &i32)> = candidates.into_iter()
+            .map(|x| (x, students[*x].c_map.get(&self.index).unwrap()))
+            .collect();
+
+            // 2.前年度実績と今年度入学定員制限から合格者数を決定。
+        self.new_enroll_num = self.enroll_num(id_and_scores.len());
         // 追加合格用人数を設定
         self.add_enroll_num = (self.new_enroll_num as f64 * conf.enroll_add_rate).round() as usize;
         self.new_enroll_num -=  self.add_enroll_num; //追加合格分を引く
         // eprintln!("add_enroll_num:{:?}", self.add_enroll_num);
 
-        // ２。受験者の配列を取得。
-        let mut id_and_scores: Vec<(&usize, &i32)> = candidates.into_iter()
-            .map(|x| (x, students[*x].c_map.get(&self.index).unwrap()))
-            .collect();
         //3.成績の良い順に合格者を決定
         id_and_scores.sort_by(|a, b| b.1.cmp(a.1));
         // println!("Coll idx: {:?} enroll_num:{:?} id&score.len :{:?}", self.index, enroll_num, id_and_scores.len());
@@ -156,8 +163,8 @@ impl College {
 
     //国公立合格者決定 
     pub fn enroll2(&mut self, students: &[Student], candidates: &[usize]) -> Vec<Sid>{
-        // 1.前年度実績と今年度入学定員制限から合格者数を決定。
-        self.new_enroll_num = self.enroll_num();
+        // 1.前年度実績と今年度入学定員制限から合格者数を決定。-> 12.31 入学者数と同一にする
+        self.new_enroll_num = self.enroll as usize;
         // ２。受験者の配列を取得。
         let mut id_and_scores: Vec<(&usize, &i32)> = candidates.into_iter()
             .map(|x| (x, students[*x].c_map.get(&self.index).unwrap()))
@@ -184,7 +191,8 @@ impl College {
             .count();
         
         // 2021.11.29 入学定員でなく、入学定員×定員超過率の数値をベースにする。
-        let base_line = (self.enroll as f64 * self.current_rate).ceil() as usize;
+        // 2021.12.31 入学定員に戻す．
+        let base_line = self.enroll as usize;
         
         let diff = if current_admisson_num > base_line{
                 0 as usize
@@ -193,7 +201,8 @@ impl College {
             };
         if  diff > 0 { //不足
             //差分に追加合格用人数を上乗せ
-            let limit = diff + self.add_enroll_num;
+            //2021.12.31 差分に今年度超過率を乗じた値にする 
+            let limit = (diff as f64 * self.current_rate).ceil() as usize + self.add_enroll_num;
             //偏差値足切り値
             let limit_score = if conf.enroll_add_lower == 0{
                     0 //偏差値足切りなし
@@ -219,7 +228,7 @@ impl College {
     }
 
     // 今年度の合格者数を計算
-    fn enroll_num(&mut self) -> usize{
+    fn enroll_num(&mut self, applicate_num: usize) -> usize{
         //2021.11.21 私立のみ変化。国公立は1.0固定
         if self.institute != Config::PRIVATE {
             return self.enroll as usize;
@@ -253,7 +262,12 @@ impl College {
                 } else {
                     self.adm_num as f64 / self.passed_num as f64
                 };
-            ((self.enroll as f64 * self.current_rate) / yield_rate).round() as usize
+            let enroll =  ((self.enroll as f64 * self.current_rate) / yield_rate).round() as usize;
+            // 2021.12.31 2年目以降は前年度受験者数と今回受験者数の変化率で補正する
+            let apply_change_rate = if self.epoch == 1 { 1 as f64 }else{
+                self.applicate_num as f64 / applicate_num as f64
+            };
+            (enroll as f64 *  apply_change_rate) as usize
             
         } else {
             // 2016(0)以前と2016(1)の増減率を取得。

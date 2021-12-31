@@ -59,6 +59,10 @@ pub struct Config{
     pub enroll_algo_version: i32,
 
     pub mean_yield_rate: f64,
+
+    // 2021.12.31
+    pub college_dev_lower: i32,
+    pub college_dev_upper: i32,
 }
 
 impl Config {

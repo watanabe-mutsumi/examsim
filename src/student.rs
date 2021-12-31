@@ -151,9 +151,18 @@ impl Student {
 
     // 大学ランク別グループの下限と上限（配列のインデックス）を返す。
     fn get_bounds(&self, lower: i32, upper: i32, colleges: &[College]) -> (usize, usize){
+        //2021.12.31 学生偏差値上限と下限の緩和
+        let dev = if self.score - 5000 < Config::get().college_dev_lower{
+            Config::get().college_dev_lower + 5000
+        // }else if self.score + 5000 > Config::get().college_dev_upper{
+        //     Config::get().college_dev_upper - 5000
+        }else {
+            self.score
+        };
+
         let max_size = colleges.len();
-        let mut lower = colleges.lower_bound_by_key(&(self.score + lower * 1000),|x| x.score);
-        let mut upper = colleges.upper_bound_by_key(&(self.score + upper * 1000),|x| x.score);
+        let mut lower = colleges.lower_bound_by_key(&(dev + lower * 1000),|x| x.score);
+        let mut upper = colleges.upper_bound_by_key(&(dev + upper * 1000),|x| x.score);
         if upper != 0{
             upper = upper - 1;
         } 

@@ -112,3 +112,13 @@ enroll_algo_version = 2
 
 #2021.12.12 2014年度の私立大学平均歩留率
 mean_yield_rate = 0.5566
+
+#2021.12.31 大学偏差値上限と下限．最低クラス最高クラスの学生の併願数が1になるのを緩和.1000倍の整数
+college_dev_lower = 36348
+college_dev_upper = 78195
+
+#2021.12.32 偏差値平均以下学生はダイアモンド受験
+college_rank_select_number_diamond = [
+    [1, 3, 2], # [0]6校選択
+    [2, 3, 2], # [1]7校選択
+]
