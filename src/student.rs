@@ -225,7 +225,7 @@ impl Student {
     
 
                 //合格大学に対し、私立専願で、最上位の大学が合格なら入学、それ以外には保留の値をもつベクトルを返す
-                passed_ids.iter()
+                let reuslt_vec = passed_ids.iter()
                     .map(|cid|{
                         (*cid, (self.id, 
                                 if *cid == select_college {
@@ -242,7 +242,13 @@ impl Student {
                                 }
                                 )
                         )})
-                    .collect()
+                    .collect();
+                //2021.12.30 私立専願で志望校合格でも保留するバグの修正
+                if let Some(id) = self.admission{
+                    vec![(id, (self.id,  Config::ADMISSION_1ST)) ]
+                }else{
+                    reuslt_vec
+                }
             }
         }
     }
@@ -294,11 +300,11 @@ impl Student {
             if let Some(v) = val {
                 match *v{
                     //私立第一志望または国公立また保留していた大学に合格している
-                    Config::R_ADMISSION_1ST | Config::R_ADMISSION_2ND |
-                    Config::R_ADMISSION_RSV => { // 2021.12.29 追加
-                        self.admission = Some(cid);
-                        return None //既に決定しているので
-                    },
+                    // Config::R_ADMISSION_1ST | Config::R_ADMISSION_2ND |
+                    // Config::R_ADMISSION_RSV => { // 2021.12.29 追加
+                    //     self.admission = Some(cid);
+                    //     return None //既に決定しているので
+                    // },
                     //追加合格の大学
                     Config::R_ENROLL_3RD => {
                         passed_colleges.push(&colleges[cid]);

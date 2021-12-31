@@ -196,6 +196,7 @@ fn enroll3(colleges:&mut Vec<College>, students: &[Student], mat: &Matrix) -> Ma
 fn admission2
     (students: &mut Vec<Student>, colleges: &[College], mat: &Matrix) -> Matrix { 
     let admission_list: Vec<(Cid, Sid)> = students.par_iter_mut()
+        .filter(|x| x.admission.is_none())
         .fold_with( Vec::new(),
             |mut acc, x|{
                 let idx = x.id;
@@ -214,17 +215,13 @@ fn admission2
 fn admission3
     (students: &mut Vec<Student>, colleges: &[College], mat: &Matrix) -> Matrix { 
     let admission_list: Vec<(Cid, Sid)> = students.par_iter_mut()
+        .filter(|x| x.admission.is_none())
         .fold_with( Vec::new(),
             |mut acc, x|{
                 let idx = x.id;
-                // match x.admission{
-                //     Some(_) => (), //2021.12.29 既に入学決定なので何もしない
-                //     None => {
-                        if let Some(college_idx) = x.admission3(&Config::get(), colleges, mat, idx){
-                            acc.push((college_idx, idx));
-                        }
-                //     }
-                // }
+                if let Some(college_idx) = x.admission3(&Config::get(), colleges, mat, idx){
+                    acc.push((college_idx, idx));
+                }
                 acc
         })
         .reduce( || Vec::new(), append_vector);

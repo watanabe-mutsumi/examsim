@@ -99,8 +99,12 @@ impl College {
         }
         college.score = (college.dev * 1000.0).round() as i32;
         //2021.12.12 入学者数，合格者数を更新
-        college.adm_num = result.admissons as u32;
-        college.passed_num = result.enroll_1st_count as u32 + result.enroll_add_count as u32;
+        //2021.12.30 追加合格入学者を含めないように修正
+        // college.adm_num = result.admisson as u32;
+        college.adm_num = (result.admisson_1st + result.admisson_rsv) as u32;
+        // 2021.12.30 合格者数に追加合格者を含めないように修正
+        // college.passed_num = result.enroll_1st_count as u32 + result.enroll_add_count as u32;
+        college.passed_num = result.enroll_1st_count as u32;
 
         college.dev_history.push(result.new_deviation);
         //定員充足率　入学者÷定員
@@ -114,7 +118,6 @@ impl College {
         //次年度の合格者超過率
         //入試結果を元に次年度のあるべき（辞退者が出ても入学定員になる）定員超過率を計算
         //合格者数/入学者数
-        //2021.11.22 学習率を導入し、変化量*lrだけ増減させる。
         college.over_rate = result.enroll_1st_count  as f64 /  result.admissons as f64; 
 
         // 2021.11.23 接地の場合、2年目以降の新しい入学定員、収容定員を設定する。最終年度は不要。
