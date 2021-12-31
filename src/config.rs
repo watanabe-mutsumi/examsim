@@ -30,6 +30,7 @@ pub struct Config{
     pub college_rank_lower: [i32; 3],
     pub college_rank_upper: [i32; 3],
     pub college_rank_select_number: [[usize; 3]; 2],
+    pub college_rank_select_number_diamond: [[usize; 3]; 2], //2021.12.31
     
     pub first_pattern_rate: f64,
     pub enroll_add_rate: f64,
@@ -61,6 +62,7 @@ pub struct Config{
     pub mean_yield_rate: f64,
 
     // 2021.12.31
+    pub college_dev_rift: bool,
     pub college_dev_lower: i32,
     pub college_dev_upper: i32,
 }

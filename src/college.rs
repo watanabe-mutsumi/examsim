@@ -265,7 +265,7 @@ impl College {
             let enroll =  ((self.enroll as f64 * self.current_rate) / yield_rate).round() as usize;
             // 2021.12.31 2年目以降は前年度受験者数と今回受験者数の変化率で補正する
             let apply_change_rate = if self.epoch == 1 { 1 as f64 }else{
-                self.applicate_num as f64 / applicate_num as f64
+                self.applicate_num as f64 / applicate_num  as f64
             };
             (enroll as f64 *  apply_change_rate) as usize
             

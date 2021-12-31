@@ -95,6 +95,13 @@ impl Student {
             _ => (),
         }
         // 2:私立大学から複数選択
+        // 2021.12.31 偏差値平均以下の学生はダイヤモアンド型受験
+        let select_nums = if self.score as f64 / 1000.0  > conf.student_dev_mu{
+            conf.college_rank_select_number.to_vec()
+        }else{
+            conf.college_rank_select_number_diamond.to_vec()
+        };
+
         let rank_num = conf.college_rank_lower.len();
         bounds = (0..rank_num).into_iter()
             .map(|i| self.get_bounds(conf.college_rank_lower[i], conf.college_rank_upper[i], privates))
@@ -104,7 +111,7 @@ impl Student {
         c_vec = (0..rank_num).into_iter()
             .map(|i| {
                 //Aランク(i==0)時、国公立にも出願する場合には選択数をその分１つ減らす
-                let mut select_number = conf.college_rank_select_number[pattern][i];
+                let mut select_number = select_nums[pattern][i];
                 match national{
                     None =>  (), //そのまま
                     _ => if i == 0 { select_number -= 1 } //１校分減らす
@@ -152,7 +159,8 @@ impl Student {
     // 大学ランク別グループの下限と上限（配列のインデックス）を返す。
     fn get_bounds(&self, lower: i32, upper: i32, colleges: &[College]) -> (usize, usize){
         //2021.12.31 学生偏差値上限と下限の緩和
-        let dev = if self.score - 5000 < Config::get().college_dev_lower{
+        let dev = if Config::get().college_dev_rift &&
+            self.score - 5000 < Config::get().college_dev_lower{
             Config::get().college_dev_lower + 5000
         // }else if self.score + 5000 > Config::get().college_dev_upper{
         //     Config::get().college_dev_upper - 5000
