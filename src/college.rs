@@ -262,17 +262,19 @@ impl College {
                 } else {
                     self.adm_num as f64 / self.passed_num as f64
                 };
-            let enroll =  ((self.enroll as f64 * self.current_rate) / yield_rate).round() as usize;
+            let enroll =  self.enroll as f64 * self.current_rate / yield_rate;
             // 2021.12.31 2年目以降は前年度受験者数と今回受験者数の変化率で補正する
-            let apply_change_rate = if self.epoch == 1 { 1 as f64 }else{
+            let apply_change_rate = if self.epoch == 0 { 1 as f64 }else{
                 self.applicate_num as f64 / applicate_num  as f64
             };
-            (enroll as f64 *  apply_change_rate) as usize
-            
+            // (enroll as f64 *  apply_change_rate) as usize
+            // 2022.01.01 超過率に対する感度
+            (enroll as f64 *  apply_change_rate * Config::get().sensitivity) as usize
+
         } else {
             // 2016(0)以前と2016(1)の増減率を取得。
             let limit_change_rate = self.current_rate / limit_table[before_current.0][self.own_scale];        
-            ((self.enroll as f64) * self.over_rate * limit_change_rate).round() as usize
+            (self.enroll as f64 * self.over_rate * limit_change_rate).round() as usize
         }
     }
 

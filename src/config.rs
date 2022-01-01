@@ -65,6 +65,8 @@ pub struct Config{
     pub college_dev_rift: bool,
     pub college_dev_lower: i32,
     pub college_dev_upper: i32,
+    // 2022.01.01
+    pub sensitivity: f64,
 }
 
 impl Config {

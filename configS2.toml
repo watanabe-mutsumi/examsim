@@ -118,3 +118,5 @@ college_rank_select_number_diamond = [
     [2, 3, 2], # [0]7校選択
     [2, 4, 2], # [1]8校選択
 ]
+#2021.01.01  今年度超過率に対する感度　乗じる
+sensitivity = 0.7
