@@ -67,6 +67,8 @@ pub struct Config{
     pub college_dev_upper: i32,
     // 2022.01.01
     pub sensitivity: f64,
+    // 2022.01.02
+    pub wait_addtion_rate: f64,
 }
 
 impl Config {

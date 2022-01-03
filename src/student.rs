@@ -162,8 +162,8 @@ impl Student {
         let dev = if Config::get().college_dev_rift &&
             self.score - 5000 < Config::get().college_dev_lower{
             Config::get().college_dev_lower + 5000
-        // }else if self.score + 5000 > Config::get().college_dev_upper{
-        //     Config::get().college_dev_upper - 5000
+        }else if self.score + 5000 > Config::get().college_dev_upper{
+            Config::get().college_dev_upper - 5000
         }else {
             self.score
         };
@@ -273,7 +273,7 @@ impl Student {
     // 国公立合格発表を受けて入学大学を選択．国公立に合格なら入学．
     // 国公立不合格の場合，入学保留中の大学のあれば最高偏差値の私立へ入学すことにしてその大学indexを返す．
     // 戻り値：国公立合格の場合，即入学決定なのでNone,国公立不合格で保留中大学もない場合もNone
-    pub fn admission2(&mut self, _conf: &Config, colleges: &[College], matrix: &Matrix, idx: Sid) -> Option<Cid>{
+    pub fn admission2(&mut self, conf: &Config, colleges: &[College], matrix: &Matrix, idx: Sid) -> Option<Cid>{
         let statuss: Vec<(Cid,Option<&u8>)> = matrix.outer_view(idx).unwrap().indices().iter()
             .map(|col| (*col, matrix.get(idx, *col)))
             .collect();
@@ -297,6 +297,11 @@ impl Student {
         }
 
         if reserved_colleges.len() == 0 {
+            return None
+        }
+
+        // 2022.1.2 保留大学を捨てて追加合格に賭ける場合，パスする
+        if self.rng.gen_bool(conf.wait_addtion_rate){
             return None
         }
 

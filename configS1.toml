@@ -103,7 +103,7 @@ new_limits = [1.0, 1.0, 1.0]
 logging = false
 
 #2021.12.12 合格者数計算ロジックのバージョン　1 or 2
-enroll_algo_version = 2
+enroll_algo_version = 1
 
 #2021.12.12 2020年度の私立大学平均歩留率
 mean_yield_rate = 0.5293
@@ -118,5 +118,8 @@ college_rank_select_number_diamond = [
     [2, 3, 2], # [0]7校選択
     [2, 4, 2], # [1]8校選択
 ]
-#2021.01.01  今年度超過率に対する感度　乗じる
-sensitivity = 0.7
+#2022.01.01  今年度超過率に対する感度　乗じる
+sensitivity = 1.0
+
+#2021.01.02  二次発表（国公立）結果で決定せず，浪人覚悟で追加合格を待つ学生の割合
+wait_addtion_rate = 0.35
